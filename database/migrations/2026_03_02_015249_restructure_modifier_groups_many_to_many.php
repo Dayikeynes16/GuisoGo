@@ -15,12 +15,13 @@ return new class extends Migration
         });
 
         // 2. Backfill restaurant_id from product → restaurant_id
-        DB::statement('
-            UPDATE modifier_groups
-            SET restaurant_id = products.restaurant_id
-            FROM products
-            WHERE modifier_groups.product_id = products.id
-        ');
+        $groups = DB::table('modifier_groups')->whereNotNull('product_id')->get();
+        foreach ($groups as $group) {
+            $restaurantId = DB::table('products')->where('id', $group->product_id)->value('restaurant_id');
+            if ($restaurantId) {
+                DB::table('modifier_groups')->where('id', $group->id)->update(['restaurant_id' => $restaurantId]);
+            }
+        }
 
         // 3. Make restaurant_id not nullable
         Schema::table('modifier_groups', function (Blueprint $table): void {
@@ -55,15 +56,13 @@ return new class extends Migration
         });
 
         // 2. Restore product_id from pivot (pick first product)
-        DB::statement('
-            UPDATE modifier_groups
-            SET product_id = mgp.product_id
-            FROM (
-                SELECT DISTINCT ON (modifier_group_id) modifier_group_id, product_id
-                FROM modifier_group_product
-            ) mgp
-            WHERE modifier_groups.id = mgp.modifier_group_id
-        ');
+        $pivotRows = DB::table('modifier_group_product')
+            ->selectRaw('modifier_group_id, MIN(product_id) as product_id')
+            ->groupBy('modifier_group_id')
+            ->get();
+        foreach ($pivotRows as $row) {
+            DB::table('modifier_groups')->where('id', $row->modifier_group_id)->update(['product_id' => $row->product_id]);
+        }
 
         // 3. Drop pivot table
         Schema::dropIfExists('modifier_group_product');
