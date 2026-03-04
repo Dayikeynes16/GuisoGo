@@ -24,6 +24,7 @@ class Order extends Model
         'delivery_cost',
         'total',
         'payment_method',
+        'cash_amount',
         'distance_km',
         'address_street',
         'address_number',

@@ -206,6 +206,9 @@ function whatsappHref(phone) {
                         </div>
                         <p class="text-right text-xs text-gray-400 mt-1">
                             Pago: {{ PAYMENT_LABELS[order.payment_method] ?? order.payment_method }}
+                            <template v-if="order.payment_method === 'cash' && order.cash_amount">
+                                · Paga con: ${{ parseFloat(order.cash_amount).toFixed(2) }}
+                            </template>
                         </p>
                     </div>
                 </div>

@@ -197,6 +197,7 @@ class OrderService
                 'delivery_cost' => $deliveryCost,
                 'total' => $total,
                 'payment_method' => $validated['payment_method'],
+                'cash_amount' => $validated['cash_amount'] ?? null,
                 'distance_km' => $validated['distance_km'] ?? null,
                 'address_street' => $validated['address_street'] ?? null,
                 'address_number' => $validated['address_number'] ?? null,
@@ -301,6 +302,14 @@ class OrderService
         };
 
         $lines[] = "💳 *Pago:* {$paymentLabel}";
+
+        if ($order->payment_method === 'cash' && $order->cash_amount) {
+            $lines[] = "💵 *Paga con:* $".number_format((float) $order->cash_amount, 2);
+            $change = (float) $order->cash_amount - (float) $order->total;
+            if ($change > 0) {
+                $lines[] = "🔄 *Cambio:* $".number_format($change, 2);
+            }
+        }
 
         if ($order->scheduled_at) {
             $lines[] = '⏰ *Hora programada:* '.$order->scheduled_at->format('H:i');
