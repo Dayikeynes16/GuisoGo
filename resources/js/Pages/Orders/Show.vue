@@ -265,23 +265,28 @@ function whatsappHref(phone) {
                             {{ DELIVERY_LABELS[order.delivery_type] }}
                         </div>
 
-                        <div v-if="order.delivery_type === 'delivery' && order.address_street" class="flex flex-col gap-1">
+                        <div v-if="order.delivery_type === 'delivery'" class="flex flex-col gap-1">
                             <p class="text-sm font-bold text-gray-500">Dirección</p>
-                            <p class="text-gray-800">{{ order.address_street }} #{{ order.address_number }}, Col. {{ order.address_colony }}</p>
+                            <p v-if="order.address_street" class="text-gray-800">{{ order.address_street }} #{{ order.address_number }}, Col. {{ order.address_colony }}</p>
                             <p v-if="order.address_references" class="text-sm text-gray-500">{{ order.address_references }}</p>
 
                             <a
-                                v-if="order.latitude && order.longitude && mapsKey"
+                                v-if="order.latitude && order.longitude"
                                 :href="`https://maps.google.com/?q=${order.latitude},${order.longitude}`"
                                 target="_blank"
                                 rel="noopener"
                                 class="block mt-2"
                             >
                                 <img
+                                    v-if="mapsKey"
                                     :src="`https://maps.googleapis.com/maps/api/staticmap?center=${order.latitude},${order.longitude}&zoom=15&size=400x200&scale=2&markers=color:red|${order.latitude},${order.longitude}&key=${mapsKey}`"
                                     alt="Mapa de ubicación"
                                     class="w-full h-40 object-cover rounded-xl"
                                 />
+                                <div v-else class="flex items-center gap-2 text-sm text-[#FF5722] mt-1">
+                                    <span class="material-symbols-outlined text-base">open_in_new</span>
+                                    Ver en Google Maps
+                                </div>
                             </a>
                         </div>
 
