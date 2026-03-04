@@ -41,6 +41,7 @@ class Order extends Model
             'subtotal' => 'decimal:2',
             'delivery_cost' => 'decimal:2',
             'total' => 'decimal:2',
+            'cash_amount' => 'decimal:2',
             'distance_km' => 'decimal:2',
             'latitude' => 'decimal:8',
             'longitude' => 'decimal:8',

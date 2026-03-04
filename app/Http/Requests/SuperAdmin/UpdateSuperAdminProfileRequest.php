@@ -4,6 +4,7 @@ namespace App\Http\Requests\SuperAdmin;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\Validator;
 
@@ -19,7 +20,7 @@ class UpdateSuperAdminProfileRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255'],
+            'email' => ['required', 'email', 'max:255', Rule::unique('super_admins')->ignore($this->user('superadmin')->id)],
             'current_password' => ['nullable', 'string'],
             'password' => ['nullable', 'confirmed', Password::defaults()],
         ];
