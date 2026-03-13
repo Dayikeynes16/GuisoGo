@@ -12,12 +12,30 @@ use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\Restaurant;
 use App\Models\RestaurantSchedule;
+use App\Services\GoogleMapsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class OrderApiTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Default Google Maps mock: 1.5 km driving distance for standard test coords.
+        $this->mockGoogleMaps();
+    }
+
+    private function mockGoogleMaps(float $distanceKm = 1.5, int $durationMinutes = 5): void
+    {
+        $mock = $this->createMock(GoogleMapsService::class);
+        $mock->method('getDistances')->willReturn([
+            ['distance_km' => $distanceKm, 'duration_minutes' => $durationMinutes],
+        ]);
+        $this->instance(GoogleMapsService::class, $mock);
+    }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
 
@@ -333,6 +351,42 @@ class OrderApiTest extends TestCase
             ->assertJsonPath('error', 'monthly_limit_reached');
     }
 
+    public function test_expired_period_returns_422(): void
+    {
+        $restaurant = $this->restaurant([
+            'orders_limit' => 100,
+            'orders_limit_start' => now()->subMonth()->startOfMonth(),
+            'orders_limit_end' => now()->subDays(3),
+        ]);
+        $branch = $this->branch($restaurant);
+        $product = $this->product($restaurant);
+        $this->withDeliveryRange($restaurant);
+
+        $this->postJson('/api/orders',
+            $this->deliveryPayload($branch, $product),
+            $this->authHeaders($restaurant),
+        )->assertUnprocessable()
+            ->assertJsonPath('error', 'monthly_limit_reached');
+    }
+
+    public function test_period_not_started_returns_422(): void
+    {
+        $restaurant = $this->restaurant([
+            'orders_limit' => 100,
+            'orders_limit_start' => now()->addDays(3),
+            'orders_limit_end' => now()->addMonth(),
+        ]);
+        $branch = $this->branch($restaurant);
+        $product = $this->product($restaurant);
+        $this->withDeliveryRange($restaurant);
+
+        $this->postJson('/api/orders',
+            $this->deliveryPayload($branch, $product),
+            $this->authHeaders($restaurant),
+        )->assertUnprocessable()
+            ->assertJsonPath('error', 'monthly_limit_reached');
+    }
+
     public function test_branch_from_other_restaurant_returns_422(): void
     {
         $restaurant = $this->restaurant();
@@ -386,15 +440,17 @@ class OrderApiTest extends TestCase
 
     public function test_delivery_without_matching_range_returns_422(): void
     {
+        $this->mockGoogleMaps(3.5); // Override: 3.5 km driving — outside 0-2 km range.
+
         $restaurant = $this->restaurant();
         $branch = $this->branch($restaurant);
         $product = $this->product($restaurant, 25.00);
-        // Range only covers 0-2 km, but Haversine distance ~3.3 km with these coords.
+        // Range only covers 0-2 km, but driving distance is 3.5 km.
         $this->withDeliveryRange($restaurant, 0, 2, 30.00);
 
         $this->postJson('/api/orders',
             $this->deliveryPayload($branch, $product, [
-                'latitude' => 19.460000,   // ~3.3 km from branch (19.43, -99.11)
+                'latitude' => 19.460000,
                 'longitude' => -99.110000,
             ]),
             $this->authHeaders($restaurant),
@@ -677,15 +733,96 @@ class OrderApiTest extends TestCase
         $product = $this->product($restaurant, 25.00);
         $this->withDeliveryRange($restaurant, 0, 10, 30.00);
 
-        // Client sends fake distance_km: 0.1, but real Haversine is ~1.1 km.
+        // Client sends fake distance_km: 0.1, but Google Maps mock returns 1.5 km.
         $this->postJson('/api/orders',
             $this->deliveryPayload($branch, $product, ['distance_km' => 0.1]),
             $this->authHeaders($restaurant),
         )->assertCreated();
 
-        $order = \App\Models\Order::latest()->first();
-        // Server-computed distance should be ~1.11 km, NOT 0.1.
+        $order = Order::latest()->first();
+        // Server-computed driving distance should be 1.5 km (from Google Maps), NOT 0.1.
         $this->assertGreaterThan(1.0, (float) $order->distance_km);
+    }
+
+    // ─── Single-selection cardinality validation ──────────────────────────
+
+    public function test_single_group_with_two_options_returns_422(): void
+    {
+        $restaurant = $this->restaurant();
+        $branch = $this->branch($restaurant);
+        $product = $this->product($restaurant, 25.00);
+
+        $group = ModifierGroup::factory()->create([
+            'restaurant_id' => $restaurant->id,
+            'product_id' => $product->id,
+            'selection_type' => 'single',
+        ]);
+        $optionA = ModifierOption::factory()->create([
+            'modifier_group_id' => $group->id,
+            'price_adjustment' => 5.00,
+        ]);
+        $optionB = ModifierOption::factory()->create([
+            'modifier_group_id' => $group->id,
+            'price_adjustment' => 3.00,
+        ]);
+
+        // Send two options for a single-selection group — should be rejected.
+        $this->postJson('/api/orders', [
+            'customer' => ['token' => 'uuid-single', 'name' => 'Test', 'phone' => '5512345678'],
+            'delivery_type' => 'pickup',
+            'branch_id' => $branch->id,
+            'payment_method' => 'cash',
+            'items' => [[
+                'product_id' => $product->id,
+                'quantity' => 1,
+                'unit_price' => $product->price,
+                'modifiers' => [
+                    ['modifier_option_id' => $optionA->id, 'price_adjustment' => 5.00],
+                    ['modifier_option_id' => $optionB->id, 'price_adjustment' => 3.00],
+                ],
+            ]],
+        ], $this->authHeaders($restaurant))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['items']);
+    }
+
+    public function test_multiple_group_with_two_options_succeeds(): void
+    {
+        $restaurant = $this->restaurant();
+        $branch = $this->branch($restaurant);
+        $product = $this->product($restaurant, 25.00);
+
+        $group = ModifierGroup::factory()->create([
+            'restaurant_id' => $restaurant->id,
+            'product_id' => $product->id,
+            'selection_type' => 'multiple',
+        ]);
+        $optionA = ModifierOption::factory()->create([
+            'modifier_group_id' => $group->id,
+            'price_adjustment' => 5.00,
+        ]);
+        $optionB = ModifierOption::factory()->create([
+            'modifier_group_id' => $group->id,
+            'price_adjustment' => 3.00,
+        ]);
+
+        // Two options for a multiple-selection group — should succeed.
+        $this->postJson('/api/orders', [
+            'customer' => ['token' => 'uuid-multi', 'name' => 'Test', 'phone' => '5512345678'],
+            'delivery_type' => 'pickup',
+            'branch_id' => $branch->id,
+            'payment_method' => 'cash',
+            'items' => [[
+                'product_id' => $product->id,
+                'quantity' => 1,
+                'unit_price' => $product->price,
+                'modifiers' => [
+                    ['modifier_option_id' => $optionA->id, 'price_adjustment' => 5.00],
+                    ['modifier_option_id' => $optionB->id, 'price_adjustment' => 3.00],
+                ],
+            ]],
+        ], $this->authHeaders($restaurant))
+            ->assertCreated();
     }
 
     public function test_cross_product_modifier_returns_422(): void

@@ -1,6 +1,6 @@
 <script setup>
-import { Head, router } from '@inertiajs/vue3'
-import { ref, computed, watch } from 'vue'
+import { Head, router, usePage } from '@inertiajs/vue3'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 
 const props = defineProps({
@@ -115,6 +115,17 @@ const DELIVERY_ICONS = {
     dine_in: 'restaurant',
 }
 
+const PAYMENT_ICONS = {
+    cash: 'payments',
+    terminal: 'credit_card',
+    transfer: 'account_balance',
+}
+
+function formatScheduledTime(dateStr) {
+    if (!dateStr) { return null }
+    return new Intl.DateTimeFormat('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(dateStr))
+}
+
 const COLUMNS = [
     { key: 'received',   label: 'Recibido',        dotClass: 'bg-orange-500', borderClass: 'border-l-orange-500' },
     { key: 'preparing',  label: 'En preparación',   dotClass: 'bg-amber-400',  borderClass: 'border-l-amber-400' },
@@ -145,6 +156,10 @@ function onDragEnd() {
     draggingOrder.value = null
     draggingFromCol.value = null
     dropTargetCol.value = null
+    // Reset after the current event cycle so the click fired by the browser
+    // at the end of the drag sequence is still blocked (preventing accidental
+    // navigation), but all subsequent clicks work normally.
+    setTimeout(() => { didDrag = false }, 0)
 }
 
 function onDragOverCol(colKey, event) {
@@ -191,6 +206,62 @@ function onCardClick(orderId) {
         router.visit(route('orders.show', orderId))
     }
 }
+
+// --- Real-time via Reverb/Echo ---
+const restaurantId = usePage().props.auth.user?.restaurant_id
+
+function removeOrderFromColumns(orderId) {
+    for (const key of Object.keys(localOrders.value)) {
+        const list = localOrders.value[key]
+        const idx = list.findIndex((o) => o.id === orderId)
+        if (idx !== -1) {
+            list.splice(idx, 1)
+            return key
+        }
+    }
+    return null
+}
+
+function isInCurrentDateRange(createdAt) {
+    if (!dateFrom.value && !dateTo.value) { return true }
+    const d = createdAt.slice(0, 10)
+    if (dateFrom.value && d < dateFrom.value) { return false }
+    if (dateTo.value && d > dateTo.value) { return false }
+    return true
+}
+
+let echoChannel = null
+
+onMounted(() => {
+    if (!restaurantId || !window.Echo) { return }
+
+    echoChannel = window.Echo.private(`restaurant.${restaurantId}`)
+        .listen('OrderCreated', (e) => {
+            if (!isInCurrentDateRange(e.order.created_at)) { return }
+            if (branchId.value && e.order.branch?.id !== Number(branchId.value)) { return }
+            const exists = localOrders.value.received?.some((o) => o.id === e.order.id)
+            if (!exists) {
+                localOrders.value.received.unshift(e.order)
+            }
+        })
+        .listen('OrderStatusChanged', (e) => {
+            removeOrderFromColumns(e.order.id)
+            const col = e.order.status
+            if (localOrders.value[col]) {
+                localOrders.value[col].unshift(e.order)
+            }
+        })
+        .listen('OrderCancelled', (e) => {
+            removeOrderFromColumns(e.order.id)
+        })
+})
+
+onUnmounted(() => {
+    if (echoChannel) {
+        window.Echo.leave(`restaurant.${restaurantId}`)
+        echoChannel = null
+    }
+})
 </script>
 
 <template>
@@ -370,9 +441,16 @@ function onCardClick(orderId) {
                         <div class="flex items-center gap-1.5 text-sm text-gray-500 mb-3">
                             <span class="material-symbols-outlined text-base" aria-hidden="true">{{ DELIVERY_ICONS[order.delivery_type] }}</span>
                             <span class="truncate">{{ order.branch?.name }}</span>
+                            <span class="material-symbols-outlined text-base ml-auto" aria-hidden="true" :title="order.payment_method">{{ PAYMENT_ICONS[order.payment_method] ?? 'help' }}</span>
                         </div>
                         <div class="flex items-center justify-between mt-auto">
-                            <span class="font-bold text-gray-900">{{ formatPrice(order.total) }}</span>
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-gray-900">{{ formatPrice(order.total) }}</span>
+                                <span v-if="order.scheduled_at" class="flex items-center gap-0.5 text-xs text-indigo-600 font-medium">
+                                    <span class="material-symbols-outlined text-sm" aria-hidden="true">schedule</span>
+                                    {{ formatScheduledTime(order.scheduled_at) }}
+                                </span>
+                            </div>
                             <span
                                 v-if="col.key === 'delivered'"
                                 class="flex items-center gap-1 text-green-600 text-xs font-bold"

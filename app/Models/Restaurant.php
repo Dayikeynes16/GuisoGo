@@ -6,13 +6,14 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 
 class Restaurant extends Model
 {
     /** @use HasFactory<\Database\Factories\RestaurantFactory> */
-    use HasFactory;
+    use HasFactory, Notifiable;
 
     protected $fillable = [
         'name',
@@ -26,6 +27,7 @@ class Restaurant extends Model
         'orders_limit',
         'orders_limit_start',
         'orders_limit_end',
+        'notify_new_orders',
         'max_branches',
         'instagram',
         'facebook',
@@ -46,6 +48,7 @@ class Restaurant extends Model
             'orders_limit' => 'integer',
             'orders_limit_start' => 'date',
             'orders_limit_end' => 'date',
+            'notify_new_orders' => 'boolean',
             'max_branches' => 'integer',
         ];
     }
@@ -104,6 +107,14 @@ class Restaurant extends Model
     public function schedules(): HasMany
     {
         return $this->hasMany(RestaurantSchedule::class)->orderBy('day_of_week');
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function routeNotificationForMail(): array
+    {
+        return $this->users->pluck('email')->all();
     }
 
     public function isCurrentlyOpen(): bool

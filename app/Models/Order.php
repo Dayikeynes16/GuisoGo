@@ -32,6 +32,8 @@ class Order extends Model
         'address_references',
         'latitude',
         'longitude',
+        'cancellation_reason',
+        'cancelled_at',
     ];
 
     protected function casts(): array
@@ -45,6 +47,7 @@ class Order extends Model
             'distance_km' => 'decimal:2',
             'latitude' => 'decimal:8',
             'longitude' => 'decimal:8',
+            'cancelled_at' => 'datetime',
         ];
     }
 
@@ -61,6 +64,11 @@ class Order extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function isCancellable(): bool
+    {
+        return in_array($this->status, ['received', 'preparing']);
     }
 
     public function items(): HasMany

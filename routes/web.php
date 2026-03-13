@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\BranchController;
+use App\Http\Controllers\CancellationController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryMethodController;
@@ -39,6 +40,10 @@ Route::middleware(['auth', 'tenant'])->group(function (): void {
     Route::get('/orders/new-count', [OrderController::class, 'newCount'])->name('orders.new-count');
     Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
     Route::put('/orders/{order}/status', [OrderController::class, 'advanceStatus'])->name('orders.advance-status');
+    Route::put('/orders/{order}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
+
+    // ─── Cancelaciones ──────────────────────────────────────────────────────────
+    Route::get('/cancellations', [CancellationController::class, 'index'])->name('cancellations.index');
 
     // ─── Configuración ─────────────────────────────────────────────────────────
     Route::get('/settings', fn () => redirect()->route('settings.general'))->name('settings.index');

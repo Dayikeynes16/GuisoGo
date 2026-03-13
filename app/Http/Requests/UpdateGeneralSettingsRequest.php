@@ -20,6 +20,17 @@ class UpdateGeneralSettingsRequest extends FormRequest
             'instagram' => ['nullable', 'string', 'max:255'],
             'facebook' => ['nullable', 'string', 'max:255'],
             'tiktok' => ['nullable', 'string', 'max:255'],
+            'notify_new_orders' => ['sometimes', 'boolean'],
+        ];
+    }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return [
+            'logo.image' => 'El archivo debe ser una imagen válida.',
+            'logo.mimes' => 'El logo debe ser de tipo: JPG, PNG, GIF o WebP.',
+            'logo.max' => 'El logo no debe pesar más de 2 MB.',
         ];
     }
 }

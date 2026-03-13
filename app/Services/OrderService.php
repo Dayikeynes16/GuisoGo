@@ -21,6 +21,7 @@ class OrderService
     public function __construct(
         private readonly LimitService $limitService,
         private readonly HaversineService $haversine,
+        private readonly GoogleMapsService $googleMaps,
     ) {}
 
     /**
@@ -169,6 +170,32 @@ class OrderService
             }
         }
 
+        // PASO 5c — Validate single-selection groups have at most one option per item.
+        foreach ($validated['items'] as $itemData) {
+            $singleGroups = ModifierGroup::query()
+                ->where('product_id', $itemData['product_id'])
+                ->where('restaurant_id', $restaurant->id)
+                ->where('selection_type', 'single')
+                ->get();
+
+            if ($singleGroups->isEmpty()) {
+                continue;
+            }
+
+            $sentOptionIds = collect($itemData['modifiers'] ?? [])->pluck('modifier_option_id')->toArray();
+
+            foreach ($singleGroups as $group) {
+                $groupOptionIds = $group->options()->pluck('id')->toArray();
+                $matches = array_intersect($sentOptionIds, $groupOptionIds);
+
+                if (count($matches) > 1) {
+                    throw ValidationException::withMessages([
+                        'items' => ['El grupo "'.$group->name.'" solo permite una opción para "'.$products[$itemData['product_id']]->name.'".'],
+                    ]);
+                }
+            }
+        }
+
         // PASO 6 — Anti-tampering: validate prices match the database.
         foreach ($validated['items'] as $itemData) {
             $product = $products[$itemData['product_id']];
@@ -197,13 +224,12 @@ class OrderService
         $deliveryCost = 0.0;
         $distanceKm = null;
         if ($validated['delivery_type'] === 'delivery') {
-            // Compute distance server-side using Haversine — never trust client-supplied distance_km.
-            $distanceKm = round($this->haversine->distance(
+            // Compute driving distance server-side via Google Maps — never trust client-supplied distance_km.
+            $distanceKm = $this->getDrivingDistance(
                 (float) $validated['latitude'],
                 (float) $validated['longitude'],
-                (float) $branch->latitude,
-                (float) $branch->longitude,
-            ), 2);
+                $branch,
+            );
 
             $range = DeliveryRange::query()
                 ->where('restaurant_id', $restaurant->id)
@@ -281,6 +307,25 @@ class OrderService
         $whatsappMessage = $this->buildWhatsAppMessage($order);
 
         return new OrderCreatedResult(order: $order, whatsappMessage: $whatsappMessage);
+    }
+
+    /**
+     * Get driving distance via Google Maps, falling back to Haversine if unavailable.
+     */
+    private function getDrivingDistance(float $clientLat, float $clientLng, Branch $branch): float
+    {
+        try {
+            $destinations = collect([['latitude' => (float) $branch->latitude, 'longitude' => (float) $branch->longitude]]);
+            $results = $this->googleMaps->getDistances($clientLat, $clientLng, $destinations);
+
+            if ($results[0]['distance_km'] < PHP_FLOAT_MAX) {
+                return round($results[0]['distance_km'], 2);
+            }
+        } catch (\Throwable) {
+            // Google Maps unavailable — fall back to Haversine.
+        }
+
+        return round($this->haversine->distance($clientLat, $clientLng, (float) $branch->latitude, (float) $branch->longitude), 2);
     }
 
     private function buildWhatsAppMessage(Order $order): string

@@ -19,7 +19,7 @@ class SettingsController extends Controller
 
         return Inertia::render('Settings/General', [
             'restaurant' => array_merge(
-                $restaurant->only(['name', 'logo_path', 'instagram', 'facebook', 'tiktok']),
+                $restaurant->only(['name', 'logo_path', 'instagram', 'facebook', 'tiktok', 'notify_new_orders']),
                 ['logo_url' => $restaurant->logo_url],
             ),
         ]);

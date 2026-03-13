@@ -24,4 +24,14 @@ class StoreCategoryRequest extends FormRequest
             'image' => ['nullable', 'image', 'mimes:jpeg,jpg,png,gif,webp', 'max:5120'],
         ];
     }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return [
+            'image.image' => 'El archivo debe ser una imagen válida.',
+            'image.mimes' => 'La imagen debe ser de tipo: JPG, PNG, GIF o WebP.',
+            'image.max' => 'La imagen no debe pesar más de 5 MB.',
+        ];
+    }
 }

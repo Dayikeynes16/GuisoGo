@@ -49,6 +49,7 @@ class StatisticsService
     {
         return (float) Order::query()
             ->where('restaurant_id', $restaurantId)
+            ->where('status', 'delivered')
             ->whereBetween('created_at', [$from, $to])
             ->sum('total');
     }
@@ -60,6 +61,7 @@ class StatisticsService
             ->join('orders as o', 'oi.order_id', '=', 'o.id')
             ->join('products as p', 'oi.product_id', '=', 'p.id')
             ->where('o.restaurant_id', $restaurantId)
+            ->where('o.status', 'delivered')
             ->whereBetween('o.created_at', [$from, $to])
             ->selectRaw('COALESCE(SUM(oi.unit_price * oi.quantity) - SUM(p.production_cost * oi.quantity), 0) as profit')
             ->value('profit');
@@ -70,6 +72,7 @@ class StatisticsService
             ->join('orders as o', 'oi.order_id', '=', 'o.id')
             ->join('modifier_options as mo', 'oim.modifier_option_id', '=', 'mo.id')
             ->where('o.restaurant_id', $restaurantId)
+            ->where('o.status', 'delivered')
             ->whereBetween('o.created_at', [$from, $to])
             ->selectRaw('COALESCE(SUM((oim.price_adjustment - mo.production_cost) * oi.quantity), 0) as profit')
             ->value('profit');

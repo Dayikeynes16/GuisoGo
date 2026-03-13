@@ -55,6 +55,15 @@ class DeliveryServiceTest extends TestCase
         ]);
     }
 
+    private function mockGoogleMaps(float $distanceKm = 0.5, int $durationMinutes = 3): void
+    {
+        $mock = $this->createMock(GoogleMapsService::class);
+        $mock->method('getDistances')->willReturn([
+            ['distance_km' => $distanceKm, 'duration_minutes' => $durationMinutes],
+        ]);
+        $this->instance(GoogleMapsService::class, $mock);
+    }
+
     // ─── Validation ──────────────────────────────────────────────────────────
 
     public function test_missing_coordinates_returns_422(): void
@@ -86,17 +95,17 @@ class DeliveryServiceTest extends TestCase
         ])->assertUnauthorized();
     }
 
-    // ─── Single branch (no Google call) ─────────────────────────────────────
+    // ─── Single branch (Google Maps driving distance) ──────────────────────
 
-    public function test_single_branch_uses_haversine_only(): void
+    public function test_single_branch_uses_google_maps_for_driving_distance(): void
     {
-        $this->instance(GoogleMapsService::class, $this->createMock(GoogleMapsService::class));
+        $this->mockGoogleMaps(0.8, 4); // 0.8 km driving, within 0-3 km free zone
 
         $restaurant = $this->restaurant();
         $this->branchAt($restaurant, 20.659698, -103.349609); // Guadalajara
         $this->addRanges($restaurant);
 
-        // Client is very close (within 3km free zone)
+        // Client is very close
         $response = $this->postJson('/api/delivery/calculate', [
             'latitude' => 20.660000,
             'longitude' => -103.350000,
@@ -110,16 +119,17 @@ class DeliveryServiceTest extends TestCase
                     'is_in_coverage', 'is_open',
                 ],
             ])
+            ->assertJsonPath('data.distance_km', 0.8)
+            ->assertJsonPath('data.duration_minutes', 4)
             ->assertJsonPath('data.is_in_coverage', true)
             ->assertJsonPath('data.delivery_cost', 0);
     }
 
     public function test_single_branch_outside_coverage_returns_false(): void
     {
-        $this->instance(GoogleMapsService::class, $this->createMock(GoogleMapsService::class));
+        $this->mockGoogleMaps(500.0, 360); // 500 km driving — far outside max 8 km range
 
         $restaurant = $this->restaurant();
-        // Branch in Guadalajara
         $this->branchAt($restaurant, 20.659698, -103.349609);
         $this->addRanges($restaurant); // Max range is 8 km
 
@@ -189,7 +199,7 @@ class DeliveryServiceTest extends TestCase
 
     public function test_inactive_branches_are_excluded(): void
     {
-        $this->instance(GoogleMapsService::class, $this->createMock(GoogleMapsService::class));
+        $this->mockGoogleMaps(0.5, 3);
 
         $restaurant = $this->restaurant();
         // Only one active branch (the inactive should be ignored)
@@ -210,7 +220,7 @@ class DeliveryServiceTest extends TestCase
 
     public function test_branch_with_no_schedule_returns_closed(): void
     {
-        $this->instance(GoogleMapsService::class, $this->createMock(GoogleMapsService::class));
+        $this->mockGoogleMaps(0.5, 3);
 
         $restaurant = $this->restaurant();
         $this->branchAt($restaurant, 20.659698, -103.349609);
@@ -226,7 +236,7 @@ class DeliveryServiceTest extends TestCase
 
     public function test_branch_with_closed_day_schedule_returns_not_open(): void
     {
-        $this->instance(GoogleMapsService::class, $this->createMock(GoogleMapsService::class));
+        $this->mockGoogleMaps(0.5, 3);
 
         $restaurant = $this->restaurant();
         $branch = $this->branchAt($restaurant, 20.659698, -103.349609);
@@ -252,7 +262,7 @@ class DeliveryServiceTest extends TestCase
 
     public function test_does_not_return_other_restaurants_branches(): void
     {
-        $this->instance(GoogleMapsService::class, $this->createMock(GoogleMapsService::class));
+        $this->mockGoogleMaps();
 
         $restaurant = $this->restaurant();
         $otherRestaurant = Restaurant::factory()->create(['is_active' => true]);

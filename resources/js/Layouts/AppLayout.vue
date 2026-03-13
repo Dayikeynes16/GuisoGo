@@ -18,6 +18,7 @@ const navItems = [
     { name: 'Dashboard', route: 'dashboard', icon: 'dashboard' },
     { name: 'Menú Digital', route: 'menu.index', icon: 'restaurant_menu' },
     { name: 'Pedidos', route: 'orders.index', icon: 'receipt_long' },
+    { name: 'Cancelaciones', route: 'cancellations.index', icon: 'cancel' },
     { name: 'Sucursales', route: 'branches.index', icon: 'store' },
     { name: 'Configuración', route: 'settings.index', icon: 'settings' },
 ]

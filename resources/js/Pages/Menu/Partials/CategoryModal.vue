@@ -39,9 +39,20 @@ const isEditing = computed(() => !!props.category)
 const title = computed(() => isEditing.value ? 'Editar Categoría' : 'Nueva Categoría')
 const subtitle = computed(() => isEditing.value ? 'Modifica los detalles de esta categoría del menú.' : 'Agrega una nueva categoría al menú.')
 
+const IMAGE_MAX_MB = 5
+const IMAGE_ACCEPT = '.jpg,.jpeg,.png,.gif,.webp'
+
 function handleImageChange(event) {
     const file = event.target.files[0]
     if (!file) { return }
+    form.clearErrors('image')
+
+    if (file.size > IMAGE_MAX_MB * 1024 * 1024) {
+        form.setError('image', `La imagen no debe pesar más de ${IMAGE_MAX_MB} MB. Tu archivo pesa ${(file.size / 1024 / 1024).toFixed(1)} MB.`)
+        event.target.value = ''
+        return
+    }
+
     form.image = file
     imagePreview.value = URL.createObjectURL(file)
 }
@@ -120,12 +131,12 @@ function submit() {
                                 @click="$refs.imageInput.click()"
                             >
                                 <img v-if="imagePreview" :src="imagePreview" class="mx-auto h-20 w-20 object-cover rounded-xl mb-2" />
-                                <div v-else class="flex flex-col items-center">
+                                <div v-if="!imagePreview" class="flex flex-col items-center">
                                     <span class="material-symbols-outlined text-[#FF5722] text-3xl mb-1" style="font-variation-settings:'FILL' 1">add_photo_alternate</span>
                                     <p class="text-sm font-medium text-gray-700">Sube una imagen</p>
-                                    <p class="text-xs text-[#FF5722]">PNG, JPG hasta 5MB</p>
                                 </div>
-                                <input ref="imageInput" type="file" accept="image/*" class="hidden" @change="handleImageChange" />
+                                <p class="text-xs text-gray-400 mt-1">JPG, PNG, GIF o WebP · Máximo 5 MB</p>
+                                <input ref="imageInput" type="file" :accept="IMAGE_ACCEPT" class="hidden" @change="handleImageChange" />
                             </div>
                             <p v-if="form.errors.image" class="mt-1 text-xs text-red-500">{{ form.errors.image }}</p>
                         </div>

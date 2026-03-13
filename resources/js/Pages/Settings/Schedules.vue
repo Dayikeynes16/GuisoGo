@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import SettingsLayout from '@/Components/SettingsLayout.vue'
@@ -23,6 +24,8 @@ const form = useForm({
     })),
 })
 
+const allClosed = computed(() => form.schedules.every((s) => s.is_closed))
+
 function submit() {
     form.put(route('settings.schedules.update'))
 }
@@ -37,6 +40,15 @@ function submit() {
         </div>
 
         <SettingsLayout>
+            <div class="pb-20">
+            <div v-if="allClosed" class="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 mb-4">
+                <span class="material-symbols-outlined text-amber-500 text-xl shrink-0 mt-0.5">warning</span>
+                <div>
+                    <p class="text-sm font-semibold text-amber-800">Tu restaurante aparece como cerrado</p>
+                    <p class="text-sm text-amber-700 mt-0.5">No tienes ningún día con horario activo. Tus clientes verán que estás cerrado y no podrán realizar pedidos.</p>
+                </div>
+            </div>
+
             <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                 <div class="px-6 py-5 border-b border-gray-100">
                     <h2 class="text-lg font-bold text-gray-900">Horarios de atención</h2>
@@ -110,6 +122,7 @@ function submit() {
                 >
                     {{ form.processing ? 'Guardando...' : 'Guardar horarios' }}
                 </button>
+            </div>
             </div>
         </SettingsLayout>
     </AppLayout>

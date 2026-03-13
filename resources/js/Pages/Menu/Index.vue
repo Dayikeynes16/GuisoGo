@@ -3,6 +3,7 @@ import { Head, Link, router } from '@inertiajs/vue3'
 import { ref, computed } from 'vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import CategoryModal from './Partials/CategoryModal.vue'
+import ConfirmModal from '@/Components/ConfirmModal.vue'
 
 const props = defineProps({
     categories: Array,
@@ -39,18 +40,44 @@ function closeModal() {
     editingCategory.value = null
 }
 
+const confirmTarget = ref(null)
+const confirmType = ref(null)
+
 function deleteCategory(category) {
-    if (!confirm(`¿Eliminar la categoría "${category.name}"? Esta acción no se puede deshacer.`)) { return }
-    router.delete(route('categories.destroy', category.id))
+    confirmTarget.value = category
+    confirmType.value = 'category'
+}
+
+function deleteProduct(product) {
+    confirmTarget.value = product
+    confirmType.value = 'product'
+}
+
+const confirmTitle = computed(() => confirmType.value === 'category' ? '¿Eliminar categoría?' : '¿Eliminar producto?')
+const confirmMessage = computed(() => {
+    if (!confirmTarget.value) return ''
+    return confirmType.value === 'category'
+        ? `La categoría "${confirmTarget.value.name}" y sus productos se eliminarán permanentemente.`
+        : `El producto "${confirmTarget.value.name}" se eliminará permanentemente.`
+})
+
+function onConfirmDelete() {
+    if (confirmType.value === 'category') {
+        router.delete(route('categories.destroy', confirmTarget.value.id))
+    } else {
+        router.delete(route('products.destroy', confirmTarget.value.id))
+    }
+    confirmTarget.value = null
+    confirmType.value = null
+}
+
+function onCancelDelete() {
+    confirmTarget.value = null
+    confirmType.value = null
 }
 
 function toggleProduct(product) {
     router.patch(route('products.toggle', product.id))
-}
-
-function deleteProduct(product) {
-    if (!confirm(`¿Eliminar el producto "${product.name}"?`)) { return }
-    router.delete(route('products.destroy', product.id))
 }
 
 function formatPrice(value) {
@@ -261,6 +288,16 @@ function formatPrice(value) {
             :show="showCategoryModal"
             :category="editingCategory"
             @close="closeModal"
+        />
+
+        <!-- Confirm delete modal -->
+        <ConfirmModal
+            :show="!!confirmTarget"
+            :title="confirmTitle"
+            :message="confirmMessage"
+            confirm-label="Eliminar"
+            @confirm="onConfirmDelete"
+            @cancel="onCancelDelete"
         />
 
     </AppLayout>

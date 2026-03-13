@@ -83,6 +83,7 @@ class ApiTest extends TestCase
                 ],
             ])
             ->assertJsonPath('data.orders_limit_reached', false)
+            ->assertJsonPath('data.limit_reason', null)
             ->assertJsonCount(1, 'data.payment_methods');
     }
 
@@ -107,7 +108,34 @@ class ApiTest extends TestCase
 
         $this->getJson('/api/restaurant', $this->authHeaders($restaurant))
             ->assertOk()
-            ->assertJsonPath('data.orders_limit_reached', true);
+            ->assertJsonPath('data.orders_limit_reached', true)
+            ->assertJsonPath('data.limit_reason', 'limit_reached');
+    }
+
+    public function test_get_restaurant_reports_period_expired(): void
+    {
+        $restaurant = $this->restaurant([
+            'orders_limit_start' => now()->subMonth()->startOfMonth(),
+            'orders_limit_end' => now()->subDays(3),
+        ]);
+
+        $this->getJson('/api/restaurant', $this->authHeaders($restaurant))
+            ->assertOk()
+            ->assertJsonPath('data.orders_limit_reached', true)
+            ->assertJsonPath('data.limit_reason', 'period_expired');
+    }
+
+    public function test_get_restaurant_reports_period_not_started(): void
+    {
+        $restaurant = $this->restaurant([
+            'orders_limit_start' => now()->addDays(3),
+            'orders_limit_end' => now()->addMonth(),
+        ]);
+
+        $this->getJson('/api/restaurant', $this->authHeaders($restaurant))
+            ->assertOk()
+            ->assertJsonPath('data.orders_limit_reached', true)
+            ->assertJsonPath('data.limit_reason', 'period_not_started');
     }
 
     // ─── GET /api/menu ───────────────────────────────────────────────────────

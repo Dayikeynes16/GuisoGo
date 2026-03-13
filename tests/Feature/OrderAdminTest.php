@@ -198,6 +198,135 @@ class OrderAdminTest extends TestCase
         $response->assertJson(['count' => 2]);
     }
 
+    // ─── Cancel order ─────────────────────────────────────────────────────────
+
+    public function test_admin_can_cancel_received_order(): void
+    {
+        [$user, $restaurant] = $this->createAdminWithRestaurant();
+        $order = $this->createOrder($restaurant->id, ['status' => 'received']);
+
+        $response = $this->actingAs($user)->put(route('orders.cancel', $order), [
+            'cancellation_reason' => 'Cliente solicitó cancelación',
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'status' => 'cancelled',
+            'cancellation_reason' => 'Cliente solicitó cancelación',
+        ]);
+        $this->assertNotNull($order->fresh()->cancelled_at);
+    }
+
+    public function test_admin_can_cancel_preparing_order(): void
+    {
+        [$user, $restaurant] = $this->createAdminWithRestaurant();
+        $order = $this->createOrder($restaurant->id, ['status' => 'preparing']);
+
+        $this->actingAs($user)->put(route('orders.cancel', $order), [
+            'cancellation_reason' => 'Producto agotado',
+        ]);
+
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'cancelled']);
+    }
+
+    public function test_admin_cannot_cancel_on_the_way_order(): void
+    {
+        [$user, $restaurant] = $this->createAdminWithRestaurant();
+        $order = $this->createOrder($restaurant->id, ['status' => 'on_the_way']);
+
+        $response = $this->actingAs($user)->put(route('orders.cancel', $order), [
+            'cancellation_reason' => 'Motivo',
+        ]);
+
+        $response->assertStatus(403);
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'on_the_way']);
+    }
+
+    public function test_admin_cannot_cancel_delivered_order(): void
+    {
+        [$user, $restaurant] = $this->createAdminWithRestaurant();
+        $order = $this->createOrder($restaurant->id, ['status' => 'delivered']);
+
+        $response = $this->actingAs($user)->put(route('orders.cancel', $order), [
+            'cancellation_reason' => 'Motivo',
+        ]);
+
+        $response->assertStatus(403);
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'delivered']);
+    }
+
+    public function test_admin_cannot_cancel_already_cancelled_order(): void
+    {
+        [$user, $restaurant] = $this->createAdminWithRestaurant();
+        $order = $this->createOrder($restaurant->id, [
+            'status' => 'cancelled',
+            'cancellation_reason' => 'Motivo original',
+            'cancelled_at' => now(),
+        ]);
+
+        $response = $this->actingAs($user)->put(route('orders.cancel', $order), [
+            'cancellation_reason' => 'Otro motivo',
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_cancel_requires_cancellation_reason(): void
+    {
+        [$user, $restaurant] = $this->createAdminWithRestaurant();
+        $order = $this->createOrder($restaurant->id, ['status' => 'received']);
+
+        $response = $this->actingAs($user)->put(route('orders.cancel', $order), []);
+
+        $response->assertSessionHasErrors('cancellation_reason');
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'received']);
+    }
+
+    public function test_admin_cannot_cancel_order_from_another_restaurant(): void
+    {
+        [$user] = $this->createAdminWithRestaurant();
+        $other = Restaurant::factory()->create();
+        $otherOrder = $this->createOrder($other->id, ['status' => 'received']);
+
+        $response = $this->actingAs($user)->put(route('orders.cancel', $otherOrder), [
+            'cancellation_reason' => 'Motivo',
+        ]);
+
+        $response->assertStatus(404);
+    }
+
+    public function test_cancelled_order_cannot_be_advanced(): void
+    {
+        [$user, $restaurant] = $this->createAdminWithRestaurant();
+        $order = $this->createOrder($restaurant->id, [
+            'status' => 'cancelled',
+            'cancellation_reason' => 'Ya no lo necesita',
+            'cancelled_at' => now(),
+        ]);
+
+        $response = $this->actingAs($user)->put(route('orders.advance-status', $order));
+
+        $response->assertRedirect();
+        $response->assertSessionHas('error');
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'cancelled']);
+    }
+
+    public function test_orders_index_excludes_cancelled_column(): void
+    {
+        [$user, $restaurant] = $this->createAdminWithRestaurant();
+        $this->createOrder($restaurant->id, [
+            'status' => 'cancelled',
+            'cancellation_reason' => 'Motivo de prueba',
+            'cancelled_at' => now(),
+        ]);
+
+        $response = $this->withoutVite()->actingAs($user)->get(route('orders.index'));
+
+        $response->assertInertia(fn ($page) => $page->missing('orders.cancelled'));
+    }
+
     // ─── Auth ──────────────────────────────────────────────────────────────────
 
     public function test_unauthenticated_user_redirected_from_orders(): void

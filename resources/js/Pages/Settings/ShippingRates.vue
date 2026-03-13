@@ -3,6 +3,7 @@ import { Head, useForm, router } from '@inertiajs/vue3'
 import { ref } from 'vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import SettingsLayout from '@/Components/SettingsLayout.vue'
+import ConfirmModal from '@/Components/ConfirmModal.vue'
 
 const props = defineProps({
     ranges: Array,
@@ -42,9 +43,19 @@ function cancelEdit() {
     editing.value = null
 }
 
+const deletingRangeId = ref(null)
+
 function deleteRange(rangeId) {
-    if (!confirm('¿Eliminar este rango?')) { return }
-    router.delete(route('settings.shipping-rates.destroy', rangeId))
+    deletingRangeId.value = rangeId
+}
+
+function onConfirmDeleteRange() {
+    router.delete(route('settings.shipping-rates.destroy', deletingRangeId.value))
+    deletingRangeId.value = null
+}
+
+function onCancelDeleteRange() {
+    deletingRangeId.value = null
 }
 
 function formatPrice(value) {
@@ -199,5 +210,14 @@ function formatPrice(value) {
                 </div>
             </div>
         </SettingsLayout>
+
+        <ConfirmModal
+            :show="!!deletingRangeId"
+            title="¿Eliminar rango?"
+            message="Este rango de tarifa se eliminará permanentemente."
+            confirm-label="Eliminar"
+            @confirm="onConfirmDeleteRange"
+            @cancel="onCancelDeleteRange"
+        />
     </AppLayout>
 </template>

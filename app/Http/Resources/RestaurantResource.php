@@ -34,6 +34,7 @@ class RestaurantResource extends JsonResource
             'schedules' => RestaurantScheduleResource::collection($this->whenLoaded('schedules')),
             'is_open' => $this->isCurrentlyOpen(),
             'orders_limit_reached' => app(LimitService::class)->isOrderLimitReached($this->resource),
+            'limit_reason' => app(LimitService::class)->limitReason($this->resource),
         ];
     }
 }

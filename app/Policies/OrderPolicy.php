@@ -21,4 +21,9 @@ class OrderPolicy
     {
         return $user->restaurant_id === $order->restaurant_id;
     }
+
+    public function cancel(User $user, Order $order): bool
+    {
+        return $user->restaurant_id === $order->restaurant_id && $order->isCancellable();
+    }
 }

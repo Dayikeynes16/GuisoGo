@@ -29,14 +29,13 @@ class DeliveryService
 
         // No active branches → cannot calculate.
         if ($branches->isEmpty()) {
-            throw new \DomainException('No active branches available for delivery calculation.');
+            throw new \DomainException('No hay sucursales activas disponibles para calcular el envío.');
         }
 
-        // PASO 2 — Single branch: skip Haversine and Google entirely.
+        // PASO 2 — Single branch: use Google Maps for driving distance (skip pre-filter).
         if ($branches->count() === 1) {
             $branch = $branches->first();
-            $distanceKm = $this->haversine->distance($clientLat, $clientLng, (float) $branch->latitude, (float) $branch->longitude);
-            $durationMinutes = 0; // Unknown without Google — caller should handle
+            [$distanceKm, $durationMinutes] = $this->getDrivingDistance($clientLat, $clientLng, $branch);
 
             return $this->buildResult($restaurant, $branch, $distanceKm, $durationMinutes);
         }
@@ -80,6 +79,27 @@ class DeliveryService
         $durationMinutes = $distances[$bestIndex]['duration_minutes'];
 
         return $this->buildResult($restaurant, $branch, $distanceKm, $durationMinutes);
+    }
+
+    /**
+     * Get driving distance via Google Maps, falling back to Haversine if unavailable.
+     *
+     * @return array{0: float, 1: int}
+     */
+    private function getDrivingDistance(float $clientLat, float $clientLng, Branch $branch): array
+    {
+        try {
+            $destinations = collect([['latitude' => (float) $branch->latitude, 'longitude' => (float) $branch->longitude]]);
+            $results = $this->googleMaps->getDistances($clientLat, $clientLng, $destinations);
+
+            if ($results[0]['distance_km'] < PHP_FLOAT_MAX) {
+                return [$results[0]['distance_km'], $results[0]['duration_minutes']];
+            }
+        } catch (\Throwable) {
+            // Google Maps unavailable — fall back to Haversine.
+        }
+
+        return [$this->haversine->distance($clientLat, $clientLng, (float) $branch->latitude, (float) $branch->longitude), 0];
     }
 
     private function buildResult(Restaurant $restaurant, Branch $branch, float $distanceKm, int $durationMinutes): DeliveryResult

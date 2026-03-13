@@ -1,6 +1,6 @@
 <script setup>
-import { Head, Link, router } from '@inertiajs/vue3'
-import { computed } from 'vue'
+import { Head, Link, router, useForm } from '@inertiajs/vue3'
+import { ref, computed } from 'vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 
 const props = defineProps({
@@ -39,6 +39,14 @@ const PAYMENT_LABELS = {
     transfer: 'Transferencia',
 }
 
+const CANCELLATION_REASONS = [
+    'El cliente ya no lo necesita',
+    'Tiempo de espera demasiado largo',
+    'Error en la selección de productos / Pedido duplicado',
+    'Falta de disponibilidad (Sin stock)',
+    'Otro',
+]
+
 const currentStepIndex = computed(() =>
     STATUS_STEPS.findIndex((s) => s.key === props.order.status),
 )
@@ -50,7 +58,43 @@ const progressWidth = computed(() => {
 })
 
 const nextStatusLabel = computed(() => NEXT_LABEL[props.order.status] ?? null)
+const isCancellable = computed(() => ['received', 'preparing'].includes(props.order.status))
+const isCancelled = computed(() => props.order.status === 'cancelled')
 
+// --- Cancel modal ---
+const showCancelModal = ref(false)
+const selectedReason = ref('')
+const customReason = ref('')
+
+const cancelForm = useForm({
+    cancellation_reason: '',
+})
+
+function openCancelModal() {
+    selectedReason.value = ''
+    customReason.value = ''
+    cancelForm.clearErrors()
+    showCancelModal.value = true
+}
+
+function submitCancellation() {
+    cancelForm.cancellation_reason = selectedReason.value === 'Otro'
+        ? customReason.value
+        : selectedReason.value
+
+    cancelForm.put(route('orders.cancel', props.order.id), {
+        preserveScroll: true,
+        onSuccess: () => { showCancelModal.value = false },
+    })
+}
+
+const canSubmitCancel = computed(() => {
+    if (!selectedReason.value) { return false }
+    if (selectedReason.value === 'Otro') { return customReason.value.trim().length > 0 }
+    return true
+})
+
+// --- Helpers ---
 function formatPrice(value) {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value)
 }
@@ -104,25 +148,49 @@ function whatsappHref(phone) {
                 <p class="text-sm text-gray-500">{{ formatDateTime(order.created_at) }} · {{ order.branch?.name }}</p>
             </div>
 
-            <button
-                v-if="nextStatusLabel"
-                class="flex items-center justify-center gap-2 bg-[#FF5722] hover:bg-[#D84315] text-white px-6 py-3 rounded-xl text-sm font-bold shadow-lg shadow-orange-200 transition hover:scale-105 active:scale-95"
-                @click="advanceStatus"
-            >
-                {{ nextStatusLabel }}
-                <span class="material-symbols-outlined text-lg">arrow_forward</span>
-            </button>
-            <div
-                v-else-if="order.status === 'delivered'"
-                class="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 px-5 py-3 rounded-xl text-sm font-bold"
-            >
-                <span class="material-symbols-outlined">check_circle</span>
-                Pedido entregado
+            <div class="flex items-center gap-3">
+                <!-- Cancel button -->
+                <button
+                    v-if="isCancellable"
+                    class="flex items-center justify-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 px-5 py-3 rounded-xl text-sm font-bold transition"
+                    @click="openCancelModal"
+                >
+                    <span class="material-symbols-outlined text-lg">cancel</span>
+                    Cancelar pedido
+                </button>
+
+                <!-- Advance button -->
+                <button
+                    v-if="nextStatusLabel"
+                    class="flex items-center justify-center gap-2 bg-[#FF5722] hover:bg-[#D84315] text-white px-6 py-3 rounded-xl text-sm font-bold shadow-lg shadow-orange-200 transition hover:scale-105 active:scale-95"
+                    @click="advanceStatus"
+                >
+                    {{ nextStatusLabel }}
+                    <span class="material-symbols-outlined text-lg">arrow_forward</span>
+                </button>
+
+                <!-- Delivered badge -->
+                <div
+                    v-else-if="order.status === 'delivered'"
+                    class="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 px-5 py-3 rounded-xl text-sm font-bold"
+                >
+                    <span class="material-symbols-outlined">check_circle</span>
+                    Pedido entregado
+                </div>
+
+                <!-- Cancelled badge -->
+                <div
+                    v-else-if="isCancelled"
+                    class="flex items-center gap-2 text-red-700 bg-red-50 border border-red-200 px-5 py-3 rounded-xl text-sm font-bold"
+                >
+                    <span class="material-symbols-outlined">cancel</span>
+                    Pedido cancelado
+                </div>
             </div>
         </div>
 
-        <!-- Status progress bar -->
-        <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-6">
+        <!-- Status progress bar (normal flow) -->
+        <div v-if="!isCancelled" class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-6">
             <div class="relative flex items-center justify-between">
                 <!-- Track -->
                 <div class="absolute left-0 top-5 h-1 w-full bg-gray-100 -translate-y-1/2 z-0"></div>
@@ -150,6 +218,22 @@ function whatsappHref(phone) {
                     >
                         {{ step.label }}
                     </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cancelled banner -->
+        <div v-else class="bg-red-50 border border-red-200 rounded-xl p-6 mb-6">
+            <div class="flex items-start gap-4">
+                <div class="flex size-10 items-center justify-center rounded-full bg-red-100 text-red-600 shrink-0">
+                    <span class="material-symbols-outlined text-xl">cancel</span>
+                </div>
+                <div>
+                    <h3 class="font-bold text-red-800 mb-1">Pedido cancelado</h3>
+                    <p class="text-sm text-red-700 mb-2">{{ order.cancellation_reason }}</p>
+                    <p v-if="order.cancelled_at" class="text-xs text-red-500">
+                        Cancelado el {{ formatDateTime(order.cancelled_at) }}
+                    </p>
                 </div>
             </div>
         </div>
@@ -312,6 +396,87 @@ function whatsappHref(phone) {
 
             </div>
         </div>
+
+        <!-- Cancel order modal -->
+        <Teleport to="body">
+            <div v-if="showCancelModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div class="absolute inset-0 bg-black/40" @click="showCancelModal = false"></div>
+
+                <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+                    <div class="p-6">
+                        <!-- Header -->
+                        <div class="flex items-start justify-between mb-1">
+                            <div class="flex items-center gap-3">
+                                <div class="flex size-10 items-center justify-center rounded-full bg-red-100 text-red-600">
+                                    <span class="material-symbols-outlined">warning</span>
+                                </div>
+                                <h2 class="text-xl font-bold text-gray-900">Cancelar pedido</h2>
+                            </div>
+                            <button @click="showCancelModal = false" class="text-gray-400 hover:text-gray-600 transition-colors ml-4">
+                                <span class="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+                        <p class="text-sm text-gray-500 mb-5 ml-[52px]">
+                            Esta acción no se puede deshacer. Selecciona el motivo de la cancelación.
+                        </p>
+
+                        <!-- Reasons -->
+                        <div class="space-y-2 mb-5">
+                            <label
+                                v-for="reason in CANCELLATION_REASONS"
+                                :key="reason"
+                                class="flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all"
+                                :class="selectedReason === reason
+                                    ? 'border-red-300 bg-red-50'
+                                    : 'border-gray-100 bg-gray-50 hover:border-gray-200'"
+                            >
+                                <input
+                                    type="radio"
+                                    name="cancel_reason"
+                                    :value="reason"
+                                    v-model="selectedReason"
+                                    class="accent-red-600"
+                                />
+                                <span class="text-sm font-medium text-gray-800">{{ reason }}</span>
+                            </label>
+                        </div>
+
+                        <!-- Custom reason textarea -->
+                        <div v-if="selectedReason === 'Otro'" class="mb-5">
+                            <textarea
+                                v-model="customReason"
+                                placeholder="Describe brevemente el motivo..."
+                                rows="3"
+                                class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-red-300"
+                            ></textarea>
+                        </div>
+
+                        <!-- Validation error -->
+                        <p v-if="cancelForm.errors.cancellation_reason" class="text-xs text-red-500 mb-4">
+                            {{ cancelForm.errors.cancellation_reason }}
+                        </p>
+
+                        <!-- Buttons -->
+                        <div class="flex gap-3">
+                            <button
+                                type="button"
+                                @click="showCancelModal = false"
+                                class="flex-1 border border-gray-200 text-gray-700 font-semibold rounded-xl py-2.5 text-sm hover:bg-gray-50 transition-colors"
+                            >
+                                Volver
+                            </button>
+                            <button
+                                @click="submitCancellation"
+                                :disabled="!canSubmitCancel || cancelForm.processing"
+                                class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl py-2.5 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {{ cancelForm.processing ? 'Cancelando...' : 'Confirmar cancelación' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
 
     </AppLayout>
 </template>

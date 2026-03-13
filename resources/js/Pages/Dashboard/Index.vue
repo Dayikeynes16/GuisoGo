@@ -86,6 +86,7 @@ const STATUS_LABELS = {
     preparing: 'En preparación',
     on_the_way: 'En camino',
     delivered: 'Entregado',
+    cancelled: 'Cancelado',
 }
 
 const STATUS_CLASSES = {
@@ -93,6 +94,7 @@ const STATUS_CLASSES = {
     preparing: 'bg-amber-100 text-amber-800',
     on_the_way: 'bg-blue-100 text-blue-800',
     delivered: 'bg-green-100 text-green-800',
+    cancelled: 'bg-red-100 text-red-800',
 }
 
 const DELIVERY_LABELS = {

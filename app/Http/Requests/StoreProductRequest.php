@@ -38,4 +38,14 @@ class StoreProductRequest extends FormRequest
             'modifier_groups.*.options.*.production_cost' => ['nullable', 'numeric', 'min:0'],
         ];
     }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return [
+            'image.image' => 'El archivo debe ser una imagen válida.',
+            'image.mimes' => 'La imagen debe ser de tipo: JPG, PNG, GIF o WebP.',
+            'image.max' => 'La imagen no debe pesar más de 2 MB.',
+        ];
+    }
 }

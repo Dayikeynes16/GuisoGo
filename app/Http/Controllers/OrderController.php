@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\OrderCancelled;
+use App\Events\OrderStatusChanged;
 use App\Http\Requests\AdvanceOrderStatusRequest;
+use App\Http\Requests\CancelOrderRequest;
 use App\Models\Branch;
 use App\Models\Order;
 use App\Services\LimitService;
@@ -47,7 +50,7 @@ class OrderController extends Controller
                 'on_the_way' => $orders->get('on_the_way', collect())->values(),
                 'delivered' => $orders->get('delivered', collect())->values(),
             ],
-            'branches' => Branch::all(['id', 'name']),
+            'branches' => Branch::where('restaurant_id', $restaurantId)->get(['id', 'name']),
             'filters' => [
                 'branch_id' => $request->branch_id,
                 'date_from' => $dateFrom,
@@ -74,15 +77,40 @@ class OrderController extends Controller
     {
         $this->authorize('update', $order);
 
+        if ($order->status === 'cancelled') {
+            return back()->with('error', 'No se puede avanzar un pedido cancelado.');
+        }
+
         $nextStatus = self::STATUS_TRANSITIONS[$order->status] ?? null;
 
         if (! $nextStatus) {
             return back()->with('error', 'El pedido ya se encuentra en el estado final.');
         }
 
+        $previousStatus = $order->status;
         $order->update(['status' => $nextStatus]);
+        $order->load(['customer:id,name,phone', 'branch:id,name']);
+
+        broadcast(new OrderStatusChanged($order, $previousStatus))->toOthers();
 
         return back()->with('success', 'Estatus actualizado.');
+    }
+
+    public function cancel(CancelOrderRequest $request, Order $order): RedirectResponse
+    {
+        $this->authorize('cancel', $order);
+
+        $previousStatus = $order->status;
+        $order->update([
+            'status' => 'cancelled',
+            'cancellation_reason' => $request->validated('cancellation_reason'),
+            'cancelled_at' => now(),
+        ]);
+        $order->load(['customer:id,name,phone', 'branch:id,name']);
+
+        broadcast(new OrderCancelled($order, $previousStatus))->toOthers();
+
+        return back()->with('success', 'Pedido cancelado.');
     }
 
     public function newCount(Request $request): JsonResponse

@@ -30,4 +30,13 @@ class OrderFactory extends Factory
             'payment_method' => 'cash',
         ];
     }
+
+    public function cancelled(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => 'cancelled',
+            'cancellation_reason' => 'Cliente solicitó cancelación',
+            'cancelled_at' => now(),
+        ]);
+    }
 }

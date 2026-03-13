@@ -1,7 +1,8 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3'
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
+import ConfirmModal from '@/Components/ConfirmModal.vue'
 
 const props = defineProps({
     branches: Array,
@@ -20,10 +21,24 @@ function toggleBranch(branch) {
     router.patch(route('branches.toggle', branch.id))
 }
 
+const deletingBranch = ref(null)
+
 function deleteBranch(branch) {
-    if (!confirm(`¿Eliminar la sucursal "${branch.name}"? Esta acción no se puede deshacer.`)) { return }
-    router.delete(route('branches.destroy', branch.id))
+    deletingBranch.value = branch
 }
+
+function onConfirmDeleteBranch() {
+    router.delete(route('branches.destroy', deletingBranch.value.id))
+    deletingBranch.value = null
+}
+
+function onCancelDeleteBranch() {
+    deletingBranch.value = null
+}
+
+const deleteBranchMessage = computed(() =>
+    deletingBranch.value ? `La sucursal "${deletingBranch.value.name}" se eliminará permanentemente.` : ''
+)
 </script>
 
 <template>
@@ -162,6 +177,15 @@ function deleteBranch(branch) {
                 Mostrando {{ branches.length }} de {{ maxBranches }} sucursales
             </div>
         </div>
+
+        <ConfirmModal
+            :show="!!deletingBranch"
+            title="¿Eliminar sucursal?"
+            :message="deleteBranchMessage"
+            confirm-label="Eliminar"
+            @confirm="onConfirmDeleteBranch"
+            @cancel="onCancelDeleteBranch"
+        />
 
     </AppLayout>
 </template>

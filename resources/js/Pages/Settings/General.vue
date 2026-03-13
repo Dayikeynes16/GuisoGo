@@ -1,4 +1,5 @@
 <script setup>
+import { ref } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import SettingsLayout from '@/Components/SettingsLayout.vue'
@@ -7,6 +8,10 @@ const props = defineProps({
     restaurant: Object,
 })
 
+const IMAGE_MAX_MB = 2
+const IMAGE_ACCEPT = '.jpg,.jpeg,.png,.gif,.webp'
+const logoPreview = ref(null)
+
 const form = useForm({
     _method: 'put',
     name: props.restaurant.name ?? '',
@@ -14,6 +19,7 @@ const form = useForm({
     instagram: props.restaurant.instagram ?? '',
     facebook: props.restaurant.facebook ?? '',
     tiktok: props.restaurant.tiktok ?? '',
+    notify_new_orders: props.restaurant.notify_new_orders ?? true,
 })
 
 function submit() {
@@ -23,7 +29,18 @@ function submit() {
 }
 
 function onLogoChange(e) {
-    form.logo = e.target.files[0] ?? null
+    const file = e.target.files[0]
+    if (!file) { return }
+    form.clearErrors('logo')
+
+    if (file.size > IMAGE_MAX_MB * 1024 * 1024) {
+        form.setError('logo', `El logo no debe pesar más de ${IMAGE_MAX_MB} MB. Tu archivo pesa ${(file.size / 1024 / 1024).toFixed(1)} MB.`)
+        e.target.value = ''
+        return
+    }
+
+    form.logo = file
+    logoPreview.value = URL.createObjectURL(file)
 }
 </script>
 
@@ -55,19 +72,21 @@ function onLogoChange(e) {
                     <!-- Logo -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Logo del restaurante</label>
-                        <div v-if="restaurant.logo_url" class="mb-3">
+                        <div class="mb-3">
                             <img
-                                :src="restaurant.logo_url"
+                                v-if="logoPreview || restaurant.logo_url"
+                                :src="logoPreview ?? restaurant.logo_url"
                                 alt="Logo actual"
                                 class="h-16 w-16 rounded-xl object-cover border border-gray-100"
                             />
                         </div>
                         <input
                             type="file"
-                            accept="image/*"
+                            :accept="IMAGE_ACCEPT"
                             class="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#FF5722]/10 file:text-[#FF5722] hover:file:bg-[#FF5722]/20"
                             @change="onLogoChange"
                         />
+                        <p class="text-xs text-gray-400 mt-1.5">JPG, PNG, GIF o WebP · Máximo 2 MB · Proporción 1:1 recomendada</p>
                         <p v-if="form.errors.logo" class="text-xs text-red-500 mt-1">{{ form.errors.logo }}</p>
                     </div>
 
@@ -104,6 +123,28 @@ function onLogoChange(e) {
                                 />
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Notificaciones -->
+                    <div class="border-t border-gray-100 pt-5">
+                        <p class="text-sm font-semibold text-gray-700 mb-4">Notificaciones</p>
+
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <button
+                                type="button"
+                                role="switch"
+                                :aria-checked="form.notify_new_orders"
+                                @click="form.notify_new_orders = !form.notify_new_orders"
+                                class="relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#FF5722]/50"
+                                :class="form.notify_new_orders ? 'bg-[#FF5722]' : 'bg-gray-200'"
+                            >
+                                <span
+                                    class="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform duration-200"
+                                    :class="form.notify_new_orders ? 'translate-x-5' : 'translate-x-0'"
+                                />
+                            </button>
+                            <span class="text-sm text-gray-700">Recibir correo cuando entre un nuevo pedido</span>
+                        </label>
                     </div>
 
                     <div class="flex justify-end pt-2">
