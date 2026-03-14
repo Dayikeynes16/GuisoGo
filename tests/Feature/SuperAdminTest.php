@@ -21,47 +21,13 @@ class SuperAdminTest extends TestCase
 
     // ─── Auth ──────────────────────────────────────────────────────────────────
 
-    public function test_superadmin_can_view_login_page(): void
-    {
-        $response = $this->withoutVite()->get(route('super.login'));
-
-        $response->assertStatus(200);
-        $response->assertInertia(fn ($page) => $page->component('SuperAdmin/Login'));
-    }
-
-    public function test_superadmin_can_login_with_valid_credentials(): void
-    {
-        $superAdmin = SuperAdmin::factory()->create(['password' => bcrypt('secret123')]);
-
-        $response = $this->post(route('super.login'), [
-            'email' => $superAdmin->email,
-            'password' => 'secret123',
-        ]);
-
-        $response->assertRedirect(route('super.dashboard'));
-        $this->assertAuthenticatedAs($superAdmin, 'superadmin');
-    }
-
-    public function test_superadmin_cannot_login_with_wrong_password(): void
-    {
-        $superAdmin = SuperAdmin::factory()->create(['password' => bcrypt('correct')]);
-
-        $response = $this->post(route('super.login'), [
-            'email' => $superAdmin->email,
-            'password' => 'wrong',
-        ]);
-
-        $response->assertSessionHasErrors('email');
-        $this->assertGuest('superadmin');
-    }
-
     public function test_superadmin_can_logout(): void
     {
         $superAdmin = $this->createSuperAdmin();
 
         $response = $this->actingAs($superAdmin, 'superadmin')->post(route('super.logout'));
 
-        $response->assertRedirect(route('super.login'));
+        $response->assertRedirect(route('login'));
         $this->assertGuest('superadmin');
     }
 
@@ -69,7 +35,7 @@ class SuperAdminTest extends TestCase
     {
         $response = $this->get(route('super.dashboard'));
 
-        $response->assertRedirect(route('super.login'));
+        $response->assertRedirect(route('login'));
     }
 
     // ─── Dashboard ─────────────────────────────────────────────────────────────
@@ -358,6 +324,6 @@ class SuperAdminTest extends TestCase
         $response = $this->actingAs($user)->get(route('super.dashboard'));
 
         // Authenticated as web user but not superadmin guard — redirected
-        $response->assertRedirect(route('super.login'));
+        $response->assertRedirect(route('login'));
     }
 }

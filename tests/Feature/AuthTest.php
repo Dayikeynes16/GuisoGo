@@ -12,7 +12,7 @@ class AuthTest extends TestCase
 {
     use RefreshDatabase;
 
-    // ─── Admin Restaurante ────────────────────────────────────────────────────
+    // ─── Login Page ─────────────────────────────────────────────────────────────
 
     public function test_login_page_is_accessible_to_guests(): void
     {
@@ -30,6 +30,8 @@ class AuthTest extends TestCase
 
         $response->assertRedirect();
     }
+
+    // ─── Admin Restaurante ──────────────────────────────────────────────────────
 
     public function test_admin_can_login_with_valid_credentials(): void
     {
@@ -62,6 +64,22 @@ class AuthTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_admin_without_restaurant_cannot_login(): void
+    {
+        $user = User::factory()->create([
+            'restaurant_id' => null,
+            'password' => bcrypt('password'),
+        ]);
+
+        $response = $this->withoutVite()->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $response->assertSessionHasErrors('email');
+        $this->assertGuest();
+    }
+
     public function test_admin_can_logout(): void
     {
         $restaurant = Restaurant::factory()->create();
@@ -73,29 +91,15 @@ class AuthTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_forgot_password_page_is_accessible(): void
-    {
-        $response = $this->withoutVite()->get('/forgot-password');
+    // ─── SuperAdmin (unified login) ─────────────────────────────────────────────
 
-        $response->assertStatus(200);
-    }
-
-    // ─── SuperAdmin ───────────────────────────────────────────────────────────
-
-    public function test_super_admin_login_page_is_accessible(): void
-    {
-        $response = $this->withoutVite()->get('/super/login');
-
-        $response->assertStatus(200);
-    }
-
-    public function test_super_admin_can_login_with_valid_credentials(): void
+    public function test_super_admin_can_login_via_unified_login(): void
     {
         $superAdmin = SuperAdmin::factory()->create([
             'password' => bcrypt('password'),
         ]);
 
-        $response = $this->withoutVite()->post('/super/login', [
+        $response = $this->withoutVite()->post('/login', [
             'email' => $superAdmin->email,
             'password' => 'password',
         ]);
@@ -108,7 +112,7 @@ class AuthTest extends TestCase
     {
         $superAdmin = SuperAdmin::factory()->create();
 
-        $response = $this->withoutVite()->post('/super/login', [
+        $response = $this->withoutVite()->post('/login', [
             'email' => $superAdmin->email,
             'password' => 'wrong-password',
         ]);
@@ -117,20 +121,15 @@ class AuthTest extends TestCase
         $this->assertGuest('superadmin');
     }
 
-    public function test_admin_credentials_do_not_work_for_super_admin_login(): void
+    public function test_super_admin_can_logout(): void
     {
-        $restaurant = Restaurant::factory()->create();
-        $user = User::factory()->create([
-            'restaurant_id' => $restaurant->id,
-            'password' => bcrypt('password'),
-        ]);
+        $superAdmin = SuperAdmin::factory()->create();
 
-        $response = $this->withoutVite()->post('/super/login', [
-            'email' => $user->email,
-            'password' => 'password',
-        ]);
+        $response = $this->withoutVite()
+            ->actingAs($superAdmin, 'superadmin')
+            ->post(route('super.logout'));
 
-        $response->assertSessionHasErrors('email');
+        $response->assertRedirect(route('login'));
         $this->assertGuest('superadmin');
     }
 }

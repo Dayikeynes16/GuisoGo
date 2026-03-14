@@ -27,7 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (AuthenticationException $e, Request $request) {
             if ($request->is('super/*')) {
-                return redirect()->route('super.login');
+                return redirect()->route('login');
             }
         });
     })->create();

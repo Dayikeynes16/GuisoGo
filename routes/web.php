@@ -14,7 +14,6 @@ use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
-use App\Http\Controllers\SuperAdmin\AuthController as SuperAdminAuthController;
 use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardController;
 use App\Http\Controllers\SuperAdmin\ProfileController as SuperAdminProfileController;
 use App\Http\Controllers\SuperAdmin\RestaurantController as SuperAdminRestaurantController;
@@ -96,13 +95,8 @@ Route::middleware(['auth', 'tenant'])->group(function (): void {
 
 // ─── SuperAdmin ───────────────────────────────────────────────────────────────
 Route::prefix('super')->name('super.')->group(function (): void {
-    Route::middleware('guest:superadmin')->group(function (): void {
-        Route::get('/login', [SuperAdminAuthController::class, 'create'])->name('login');
-        Route::post('/login', [SuperAdminAuthController::class, 'store'])->middleware('throttle:5,1');
-    });
-
     Route::middleware('auth:superadmin')->group(function (): void {
-        Route::post('/logout', [SuperAdminAuthController::class, 'destroy'])->name('logout');
+        Route::post('/logout', [LoginController::class, 'destroySuperAdmin'])->name('logout');
 
         Route::get('/dashboard', [SuperAdminDashboardController::class, 'index'])->name('dashboard');
 

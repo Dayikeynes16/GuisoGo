@@ -44,6 +44,6 @@ class TenantContextTest extends TestCase
 
         $response = $this->withoutVite()->actingAs($user)->get('/super/dashboard');
 
-        $response->assertRedirect(route('super.login'));
+        $response->assertRedirect(route('login'));
     }
 }
