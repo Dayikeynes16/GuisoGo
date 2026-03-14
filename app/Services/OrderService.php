@@ -334,7 +334,7 @@ class OrderService
         $deliveryLine = match ($order->delivery_type) {
             'delivery' => '🛵 *A domicilio*',
             'pickup' => '🏃 *Recoger en local*',
-            'dine_in' => '🍽️ *Comer aquí*',
+            'dine_in' => '🍴 *Comer aquí*',
             default => '',
         };
 
@@ -343,7 +343,7 @@ class OrderService
             '',
             $deliveryLine,
             '',
-            '🍽️ *Mi pedido:*',
+            '📝 *Mi pedido:*',
         ];
 
         foreach ($order->items as $item) {
