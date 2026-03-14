@@ -233,9 +233,10 @@ function isInCurrentDateRange(createdAt) {
 let echoChannel = null
 
 onMounted(() => {
-    if (!restaurantId || !window.Echo) { return }
+    const echo = window.getEcho?.()
+    if (!restaurantId || !echo) { return }
 
-    echoChannel = window.Echo.private(`restaurant.${restaurantId}`)
+    echoChannel = echo.private(`restaurant.${restaurantId}`)
         .listen('OrderCreated', (e) => {
             if (!isInCurrentDateRange(e.order.created_at)) { return }
             if (branchId.value && e.order.branch?.id !== Number(branchId.value)) { return }
@@ -258,7 +259,7 @@ onMounted(() => {
 
 onUnmounted(() => {
     if (echoChannel) {
-        window.Echo.leave(`restaurant.${restaurantId}`)
+        window.getEcho?.()?.leave(`restaurant.${restaurantId}`)
         echoChannel = null
     }
 })
