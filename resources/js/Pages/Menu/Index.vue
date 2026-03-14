@@ -216,7 +216,7 @@ function onProdDragEnd() {
         <div class="flex items-start justify-between mb-6">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900">Menu Digital</h1>
-                <p class="mt-1 text-sm text-gray-500">Gestiona tus categorias, productos y disponibilidad. Arrastra para reordenar.</p>
+                <p class="mt-1 text-sm text-gray-500">El orden que ves aqui es el que veran tus clientes. Arrastra para reorganizar el menu.</p>
             </div>
             <div class="flex items-center gap-3">
                 <Link
@@ -262,8 +262,14 @@ function onProdDragEnd() {
             </button>
         </div>
 
-        <!-- Categories accordion with DnD -->
-        <div v-else class="space-y-3">
+        <!-- Ordering hint + Categories accordion with DnD -->
+        <template v-else>
+            <div class="flex items-center gap-2 mb-4 px-4 py-2.5 bg-orange-50/60 border border-orange-100 rounded-xl">
+                <span class="material-symbols-outlined text-[#FF5722] text-lg shrink-0" aria-hidden="true">swap_vert</span>
+                <p class="text-sm text-gray-600">Arrastra las categorias y productos para cambiar el orden en que apareceran en el menu de tus clientes.</p>
+            </div>
+
+            <div class="space-y-3">
             <div
                 v-for="(category, catIndex) in localCategories"
                 :key="category.id"
@@ -283,9 +289,9 @@ function onProdDragEnd() {
                 <!-- Category header -->
                 <div class="flex items-center gap-3 px-5 py-4">
                     <!-- Position number + drag handle -->
-                    <div class="flex items-center gap-1.5 shrink-0 cursor-grab active:cursor-grabbing select-none">
-                        <span class="text-xs font-bold text-gray-300 w-5 text-center">{{ catIndex + 1 }}</span>
-                        <span class="material-symbols-outlined text-gray-300 hover:text-gray-400 transition-colors">drag_indicator</span>
+                    <div class="flex items-center gap-1.5 shrink-0 cursor-grab active:cursor-grabbing select-none" aria-label="Arrastra para reordenar categoria">
+                        <span class="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gray-100 text-xs font-semibold text-gray-500 tabular-nums">{{ catIndex + 1 }}</span>
+                        <span class="material-symbols-outlined text-gray-300 hover:text-gray-400 transition-colors" aria-hidden="true">drag_indicator</span>
                     </div>
 
                     <div class="flex-1 flex items-center gap-3 min-w-0">
@@ -316,22 +322,23 @@ function onProdDragEnd() {
                         <button
                             @click="openEditCategory(category)"
                             class="p-2 text-gray-400 hover:text-[#FF5722] hover:bg-orange-50 rounded-xl transition-colors"
-                            title="Editar"
+                            :aria-label="`Editar categoria ${category.name}`"
                         >
-                            <span class="material-symbols-outlined text-lg">edit</span>
+                            <span class="material-symbols-outlined text-lg" aria-hidden="true">edit</span>
                         </button>
                         <button
                             @click="deleteCategory(category)"
                             class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
-                            title="Eliminar"
+                            :aria-label="`Eliminar categoria ${category.name}`"
                         >
-                            <span class="material-symbols-outlined text-lg">delete</span>
+                            <span class="material-symbols-outlined text-lg" aria-hidden="true">delete</span>
                         </button>
                         <button
                             @click="toggleCategory(category.id)"
                             class="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-50 rounded-xl transition-colors"
+                            :aria-label="expandedCategories.has(category.id) ? 'Colapsar categoria' : 'Expandir categoria'"
                         >
-                            <span class="material-symbols-outlined text-lg">{{ expandedCategories.has(category.id) ? 'expand_less' : 'expand_more' }}</span>
+                            <span class="material-symbols-outlined text-lg" aria-hidden="true">{{ expandedCategories.has(category.id) ? 'expand_less' : 'expand_more' }}</span>
                         </button>
                     </div>
                 </div>
@@ -358,7 +365,7 @@ function onProdDragEnd() {
                     <table v-else class="w-full">
                         <thead>
                             <tr class="border-b border-gray-50">
-                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wide w-20">#</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wide w-20">Orden</th>
                                 <th class="px-2 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wide w-16">Foto</th>
                                 <th class="px-2 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wide">Nombre del producto</th>
                                 <th class="px-2 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wide">Precio</th>
@@ -384,9 +391,9 @@ function onProdDragEnd() {
                                 @dragend="onProdDragEnd"
                             >
                                 <td class="px-3 py-3">
-                                    <div class="flex items-center gap-1 cursor-grab active:cursor-grabbing select-none">
-                                        <span class="text-xs font-bold text-gray-300 w-4 text-center">{{ prodIndex + 1 }}</span>
-                                        <span class="material-symbols-outlined text-gray-300 hover:text-gray-400 transition-colors text-lg">drag_indicator</span>
+                                    <div class="flex items-center gap-1 cursor-grab active:cursor-grabbing select-none" aria-label="Arrastra para reordenar producto">
+                                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-md bg-gray-100 text-xs font-semibold text-gray-500 tabular-nums">{{ prodIndex + 1 }}</span>
+                                        <span class="material-symbols-outlined text-gray-300 hover:text-gray-400 transition-colors text-lg" aria-hidden="true">drag_indicator</span>
                                     </div>
                                 </td>
                                 <td class="px-2 py-3">
@@ -414,6 +421,7 @@ function onProdDragEnd() {
                                         @click="toggleProduct(product)"
                                         class="w-10 h-6 rounded-full transition-colors relative"
                                         :class="product.is_active ? 'bg-[#FF5722]' : 'bg-gray-200'"
+                                        :aria-label="`${product.is_active ? 'Desactivar' : 'Activar'} ${product.name}`"
                                     >
                                         <div class="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all"
                                             :class="product.is_active ? 'left-5' : 'left-1'" />
@@ -424,14 +432,16 @@ function onProdDragEnd() {
                                         <Link
                                             :href="route('products.edit', product.id)"
                                             class="p-1.5 text-gray-400 hover:text-[#FF5722] hover:bg-orange-50 rounded-lg transition-colors"
+                                            :aria-label="`Editar ${product.name}`"
                                         >
-                                            <span class="material-symbols-outlined text-base">edit</span>
+                                            <span class="material-symbols-outlined text-base" aria-hidden="true">edit</span>
                                         </Link>
                                         <button
                                             @click="deleteProduct(product)"
                                             class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                            :aria-label="`Eliminar ${product.name}`"
                                         >
-                                            <span class="material-symbols-outlined text-base">delete</span>
+                                            <span class="material-symbols-outlined text-base" aria-hidden="true">delete</span>
                                         </button>
                                     </div>
                                 </td>
@@ -441,6 +451,7 @@ function onProdDragEnd() {
                 </div>
             </div>
         </div>
+        </template>
 
         <!-- Category modal -->
         <CategoryModal

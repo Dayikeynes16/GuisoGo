@@ -28,26 +28,29 @@ function applyFilter() {
     }, { preserveState: true, preserveScroll: true })
 }
 
+function localDateStr(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function setPreset(preset) {
     const today = new Date()
-    const fmt = (d) => d.toISOString().slice(0, 10)
 
     if (preset === 'today') {
-        from.value = fmt(today)
-        to.value = fmt(today)
+        from.value = localDateStr(today)
+        to.value = localDateStr(today)
     } else if (preset === 'yesterday') {
         const y = new Date(today)
         y.setDate(y.getDate() - 1)
-        from.value = fmt(y)
-        to.value = fmt(y)
+        from.value = localDateStr(y)
+        to.value = localDateStr(y)
     } else if (preset === 'week') {
         const w = new Date(today)
         w.setDate(w.getDate() - 6)
-        from.value = fmt(w)
-        to.value = fmt(today)
+        from.value = localDateStr(w)
+        to.value = localDateStr(today)
     } else if (preset === 'month') {
-        from.value = fmt(new Date(today.getFullYear(), today.getMonth(), 1))
-        to.value = fmt(today)
+        from.value = localDateStr(new Date(today.getFullYear(), today.getMonth(), 1))
+        to.value = localDateStr(today)
     }
     applyFilter()
 }
@@ -55,17 +58,16 @@ function setPreset(preset) {
 const activePreset = computed(() => {
     const f = from.value
     const t = to.value
-    const todayStr = new Date().toISOString().slice(0, 10)
+    const todayStr = localDateStr(new Date())
     if (f === todayStr && t === todayStr) { return 'today' }
     const y = new Date()
     y.setDate(y.getDate() - 1)
-    const yd = y.toISOString().slice(0, 10)
-    if (f === yd && t === yd) { return 'yesterday' }
+    if (f === localDateStr(y) && t === localDateStr(y)) { return 'yesterday' }
     const w = new Date()
     w.setDate(w.getDate() - 6)
-    if (f === w.toISOString().slice(0, 10) && t === todayStr) { return 'week' }
-    const m = new Date().toISOString().slice(0, 8) + '01'
-    if (f === m && t === todayStr) { return 'month' }
+    if (f === localDateStr(w) && t === todayStr) { return 'week' }
+    const ms = new Date()
+    if (f === localDateStr(new Date(ms.getFullYear(), ms.getMonth(), 1)) && t === todayStr) { return 'month' }
     return 'custom'
 })
 

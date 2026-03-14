@@ -1,5 +1,6 @@
 <script setup>
-import { Head, useForm } from '@inertiajs/vue3'
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
+import { computed } from 'vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import SettingsLayout from '@/Components/SettingsLayout.vue'
 
@@ -14,6 +15,8 @@ const form = useForm({
     allows_dine_in: props.restaurant.allows_dine_in ?? false,
 })
 
+const flash = computed(() => usePage().props.flash)
+
 function submit() {
     form.put(route('settings.delivery-methods.update'))
 }
@@ -22,22 +25,26 @@ const METHODS = [
     {
         key: 'allows_delivery',
         label: 'Entrega a domicilio',
-        description: 'El cliente recibe su pedido en su dirección. Activa el flujo de geolocalización y cálculo de envío.',
+        description: 'Tus clientes reciben el pedido en su direccion. Se calcula el costo de envio segun la distancia.',
         icon: 'two_wheeler',
     },
     {
         key: 'allows_pickup',
         label: 'Recoger en sucursal',
-        description: 'El cliente recoge su pedido directamente en la sucursal más cercana.',
+        description: 'Tus clientes recogen su pedido en la sucursal mas cercana. Sin costo de envio.',
         icon: 'store',
     },
     {
         key: 'allows_dine_in',
         label: 'Comer en el lugar',
-        description: 'El cliente consume en el establecimiento. Ideal para pedidos en mesa.',
+        description: 'Tus clientes consumen en el establecimiento. Ideal para pedidos en mesa.',
         icon: 'restaurant',
     },
 ]
+
+const activeCount = computed(() => {
+    return [form.allows_delivery, form.allows_pickup, form.allows_dine_in].filter(Boolean).length
+})
 </script>
 
 <template>
@@ -50,35 +57,66 @@ const METHODS = [
 
         <SettingsLayout>
             <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-                <h2 class="text-lg font-bold text-gray-900 mb-2">Métodos de entrega</h2>
-                <p class="text-sm text-gray-500 mb-6">Al menos un método debe estar activo para poder recibir pedidos.</p>
+                <h2 class="text-lg font-bold text-gray-900 mb-1">Metodos de entrega</h2>
+                <p class="text-sm text-gray-500 mb-6">Define como pueden recibir los pedidos tus clientes. Los metodos activos apareceran como opciones al momento de ordenar.</p>
 
-                <form @submit.prevent="submit" class="space-y-4">
+                <!-- Success flash -->
+                <div
+                    v-if="flash?.success"
+                    class="flex items-center gap-2 mb-4 px-4 py-2.5 bg-green-50 border border-green-100 rounded-xl"
+                    aria-live="polite"
+                >
+                    <span class="material-symbols-outlined text-green-600 text-lg" aria-hidden="true">check_circle</span>
+                    <p class="text-sm text-green-700">{{ flash.success }}</p>
+                </div>
+
+                <form @submit.prevent="submit" class="space-y-3">
                     <div
                         v-for="method in METHODS"
                         :key="method.key"
-                        class="flex items-start justify-between gap-4 p-4 rounded-xl border border-gray-100 hover:bg-gray-50/50 transition-colors"
+                        class="flex items-start justify-between gap-4 p-4 rounded-xl border transition-colors"
+                        :class="[
+                            form[method.key]
+                                ? 'border-[#FF5722]/20 bg-orange-50/30'
+                                : 'border-gray-100 hover:bg-gray-50/50',
+                            method.key === 'allows_delivery' && !has_delivery_ranges ? 'opacity-70' : '',
+                        ]"
                     >
                         <div class="flex items-start gap-3">
-                            <div class="p-2 bg-[#FF5722]/10 rounded-lg mt-0.5">
-                                <span class="material-symbols-outlined text-[#FF5722]">{{ method.icon }}</span>
+                            <div class="p-2 rounded-lg mt-0.5" :class="form[method.key] ? 'bg-[#FF5722]/10' : 'bg-gray-100'">
+                                <span class="material-symbols-outlined" :class="form[method.key] ? 'text-[#FF5722]' : 'text-gray-400'" aria-hidden="true">{{ method.icon }}</span>
                             </div>
                             <div>
-                                <p class="text-sm font-semibold text-gray-800">{{ method.label }}</p>
+                                <div class="flex items-center gap-2">
+                                    <p class="text-sm font-semibold text-gray-800">{{ method.label }}</p>
+                                    <span
+                                        class="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full"
+                                        :class="form[method.key]
+                                            ? 'bg-green-50 text-green-600'
+                                            : 'bg-gray-100 text-gray-400'"
+                                    >
+                                        {{ form[method.key] ? 'Activo' : 'Inactivo' }}
+                                    </span>
+                                </div>
                                 <p class="text-xs text-gray-500 mt-0.5">{{ method.description }}</p>
                                 <p
                                     v-if="method.key === 'allows_delivery' && !has_delivery_ranges"
-                                    class="text-xs text-amber-600 mt-1 flex items-center gap-1"
+                                    class="text-xs text-amber-600 mt-1.5 flex items-center gap-1"
                                 >
                                     <span class="material-symbols-outlined text-sm" aria-hidden="true">warning</span>
-                                    Configura al menos una tarifa de envío para activar esta opción.
+                                    Primero
+                                    <Link :href="route('settings.shipping-rates.index')" class="underline font-medium hover:text-amber-700">configura tus tarifas de envio</Link>
+                                    para poder activar esta opcion.
                                 </p>
                             </div>
                         </div>
                         <!-- Toggle -->
                         <button
                             type="button"
-                            class="relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-[#FF5722]/50"
+                            role="switch"
+                            :aria-checked="form[method.key]"
+                            :aria-label="`${form[method.key] ? 'Desactivar' : 'Activar'} ${method.label}`"
+                            class="relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5722]/50 focus-visible:ring-offset-2"
                             :class="[
                                 form[method.key] ? 'bg-[#FF5722]' : 'bg-gray-200',
                                 method.key === 'allows_delivery' && !has_delivery_ranges ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
@@ -89,11 +127,22 @@ const METHODS = [
                             <span
                                 class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
                                 :class="form[method.key] ? 'translate-x-5' : 'translate-x-0'"
+                                aria-hidden="true"
                             ></span>
                         </button>
                     </div>
 
-                    <p v-if="form.errors.allows_delivery" class="text-xs text-red-500">{{ form.errors.allows_delivery }}</p>
+                    <!-- Validation errors -->
+                    <div v-if="form.errors.allows_delivery" class="flex items-center gap-2 px-4 py-2.5 bg-red-50 border border-red-100 rounded-xl" aria-live="polite">
+                        <span class="material-symbols-outlined text-red-500 text-lg shrink-0" aria-hidden="true">error</span>
+                        <p class="text-sm text-red-600">{{ form.errors.allows_delivery }}</p>
+                    </div>
+
+                    <!-- Minimum methods hint -->
+                    <p v-if="activeCount === 1" class="text-xs text-amber-600 flex items-center gap-1 px-1">
+                        <span class="material-symbols-outlined text-sm" aria-hidden="true">info</span>
+                        Solo tienes un metodo activo. Si lo desactivas, no podras recibir pedidos.
+                    </p>
 
                     <div class="flex justify-end pt-2">
                         <button
@@ -101,7 +150,7 @@ const METHODS = [
                             :disabled="form.processing"
                             class="bg-[#FF5722] hover:bg-[#D84315] text-white font-semibold rounded-xl px-6 py-2.5 text-sm transition-colors disabled:opacity-60"
                         >
-                            {{ form.processing ? 'Guardando...' : 'Guardar cambios' }}
+                            {{ form.processing ? 'Guardando…' : 'Guardar cambios' }}
                         </button>
                     </div>
                 </form>

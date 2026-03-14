@@ -8,6 +8,14 @@ const props = defineProps({
     mapsKey: { type: String, default: '' },
 })
 
+function goBack() {
+    if (window.history.length > 1) {
+        window.history.back()
+    } else {
+        router.visit(route('orders.index'))
+    }
+}
+
 const STATUS_STEPS = [
     { key: 'received',   label: 'Recibido',     icon: 'receipt_long' },
     { key: 'preparing',  label: 'Preparación',  icon: 'skillet' },
@@ -153,10 +161,10 @@ function whatsappHref(phone) {
         <div class="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-6">
             <div class="flex flex-col gap-1">
                 <div class="flex items-center gap-2 text-sm text-gray-500">
-                    <Link :href="route('orders.index')" class="hover:text-[#FF5722] flex items-center gap-1 transition-colors">
-                        <span class="material-symbols-outlined text-lg">arrow_back</span>
-                        Pedidos
-                    </Link>
+                    <button @click="goBack" class="hover:text-[#FF5722] flex items-center gap-1 transition-colors">
+                        <span class="material-symbols-outlined text-lg" aria-hidden="true">arrow_back</span>
+                        Regresar
+                    </button>
                     <span class="text-gray-300">/</span>
                     <span class="text-gray-800 font-medium">Pedido {{ orderNumber(order.id) }}</span>
                 </div>

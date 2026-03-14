@@ -40,7 +40,7 @@ class StoreDeliveryRangeRequest extends FormRequest
                 ->exists();
 
             if ($overlaps) {
-                $validator->errors()->add('min_km', 'Este rango se solapa con uno existente.');
+                $validator->errors()->add('min_km', 'Este rango se superpone con otro existente. Ajusta los valores para que no se crucen.');
             }
         });
     }
@@ -49,15 +49,15 @@ class StoreDeliveryRangeRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'min_km.required' => 'El km mínimo es obligatorio.',
-            'min_km.numeric' => 'El km mínimo debe ser un número.',
-            'min_km.min' => 'El km mínimo no puede ser negativo.',
-            'max_km.required' => 'El km máximo es obligatorio.',
-            'max_km.numeric' => 'El km máximo debe ser un número.',
-            'max_km.gt' => 'El km máximo debe ser mayor al km mínimo.',
-            'price.required' => 'El precio es obligatorio.',
-            'price.numeric' => 'El precio debe ser un número.',
-            'price.min' => 'El precio no puede ser negativo.',
+            'min_km.required' => 'El campo "Desde (km)" es obligatorio.',
+            'min_km.numeric' => '"Desde (km)" debe ser un número.',
+            'min_km.min' => '"Desde (km)" no puede ser negativo.',
+            'max_km.required' => 'El campo "Hasta (km)" es obligatorio.',
+            'max_km.numeric' => '"Hasta (km)" debe ser un número.',
+            'max_km.gt' => '"Hasta (km)" debe ser mayor que "Desde (km)".',
+            'price.required' => 'El costo de envío es obligatorio.',
+            'price.numeric' => 'El costo de envío debe ser un número.',
+            'price.min' => 'El costo de envío no puede ser negativo.',
         ];
     }
 }

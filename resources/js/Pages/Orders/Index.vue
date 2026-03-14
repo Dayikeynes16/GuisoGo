@@ -24,7 +24,11 @@ const dateFrom = ref(props.filters?.date_from ?? '')
 const dateTo = ref(props.filters?.date_to ?? '')
 const showCustomRange = ref(false)
 
-const today = new Date().toISOString().slice(0, 10)
+function localDateStr(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+const today = localDateStr(new Date())
 
 function applyFilters() {
     router.get(route('orders.index'), {
@@ -46,16 +50,15 @@ function setPreset(preset) {
     } else if (preset === 'yesterday') {
         const y = new Date(now)
         y.setDate(y.getDate() - 1)
-        const yd = y.toISOString().slice(0, 10)
-        dateFrom.value = yd
-        dateTo.value = yd
+        dateFrom.value = localDateStr(y)
+        dateTo.value = localDateStr(y)
     } else if (preset === 'week') {
         const w = new Date(now)
         w.setDate(w.getDate() - 6)
-        dateFrom.value = w.toISOString().slice(0, 10)
+        dateFrom.value = localDateStr(w)
         dateTo.value = today
     } else if (preset === 'month') {
-        dateFrom.value = now.toISOString().slice(0, 8) + '01'
+        dateFrom.value = localDateStr(new Date(now.getFullYear(), now.getMonth(), 1))
         dateTo.value = today
     } else if (preset === 'all') {
         dateFrom.value = ''
@@ -71,13 +74,12 @@ const activePreset = computed(() => {
     if (from === today && to === today) { return 'today' }
     const y = new Date()
     y.setDate(y.getDate() - 1)
-    const yd = y.toISOString().slice(0, 10)
-    if (from === yd && to === yd) { return 'yesterday' }
+    if (from === localDateStr(y) && to === localDateStr(y)) { return 'yesterday' }
     const w = new Date()
     w.setDate(w.getDate() - 6)
-    if (from === w.toISOString().slice(0, 10) && to === today) { return 'week' }
-    const m = new Date().toISOString().slice(0, 8) + '01'
-    if (from === m && to === today) { return 'month' }
+    if (from === localDateStr(w) && to === today) { return 'week' }
+    const ms = new Date()
+    if (from === localDateStr(new Date(ms.getFullYear(), ms.getMonth(), 1)) && to === today) { return 'month' }
     return 'custom'
 })
 
