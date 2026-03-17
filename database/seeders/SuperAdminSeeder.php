@@ -17,7 +17,7 @@ class SuperAdminSeeder extends Seeder
     public function run(): void
     {
         SuperAdmin::firstOrCreate(
-            ['email' => 'admin@guisogo.com'],
+            ['email' => 'admin@pideaqui.com'],
             [
                 'name' => 'Super Admin',
                 'password' => Hash::make('password'),

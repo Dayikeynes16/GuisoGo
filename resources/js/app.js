@@ -6,7 +6,7 @@ import { ZiggyVue } from '../../vendor/tightenco/ziggy'
 import '../css/app.css'
 
 createInertiaApp({
-    title: (title) => `${title} — GuisoGo`,
+    title: (title) => `${title} — PideAqui`,
     resolve: (name) => resolvePageComponent(
         `./Pages/${name}.vue`,
         import.meta.glob('./Pages/**/*.vue')

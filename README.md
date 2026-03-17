@@ -1,6 +1,6 @@
-# GuisoGo — Panel de Administracion y Backend
+# PideAqui — Panel de Administracion y Backend
 
-Panel de administracion del restaurante y SuperAdmin para la plataforma SaaS **GuisoGo** — menu digital y gestion de pedidos multi-restaurante para Mexico.
+Panel de administracion del restaurante y SuperAdmin para la plataforma SaaS **PideAqui** — menu digital y gestion de pedidos multi-restaurante para Mexico.
 
 Tambien sirve como backend API para la [SPA del cliente](../client/).
 
@@ -14,6 +14,7 @@ Tambien sirve como backend API para la [SPA del cliente](../client/).
 | Laravel | v12 |
 | PostgreSQL | 18 |
 | Laravel Sail | v1 (Docker) |
+| Laravel Reverb | v1.8 (WebSockets) |
 | Inertia.js | v2 |
 | Vue 3 | v3 |
 | Tailwind CSS | v4 |
@@ -36,8 +37,8 @@ Tambien sirve como backend API para la [SPA del cliente](../client/).
 ### 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/Dayikeynes16/GuisoGo.git
-cd GuisoGo/admin
+git clone https://github.com/Dayikeynes16/PideAqui.git
+cd PideAqui/admin
 ```
 
 ### 2. Copiar variables de entorno
@@ -103,16 +104,36 @@ DB_USERNAME=sail
 DB_PASSWORD=password
 
 # --- Aplicacion ---
-APP_NAME=GuisoGo
+APP_NAME=PideAqui
 APP_TIMEZONE=America/Mexico_City
 APP_URL=http://localhost          # Cambiar en produccion
+
+# --- Google Maps ---
+# Se necesitan DOS variables con la misma API key (o keys distintas en produccion):
+# Frontend: mapas interactivos en el panel admin (sucursales, detalle pedido, mapa operativo)
+VITE_GOOGLE_MAPS_KEY=tu_api_key_de_google_maps
+# Backend: calculo de distancia real por calles (Distance Matrix API en DeliveryService)
+GOOGLE_MAPS_API_KEY=tu_api_key_de_google_maps
 
 # --- Almacenamiento de imagenes ---
 # 'public' para desarrollo local, 's3' para produccion
 MEDIA_DISK=public
 
-# --- Google Maps (requerido para calculo de delivery) ---
-VITE_GOOGLE_MAPS_KEY=tu_api_key_de_google_maps
+# --- WebSockets (Laravel Reverb) ---
+# Necesario para el tablero Kanban de pedidos en tiempo real.
+BROADCAST_CONNECTION=reverb
+REVERB_APP_ID=tu_app_id
+REVERB_APP_KEY=tu_app_key
+REVERB_APP_SECRET=tu_app_secret
+REVERB_HOST=localhost              # Cambiar en produccion
+REVERB_PORT=8080
+REVERB_SCHEME=http                 # 'https' en produccion
+
+# --- Email (notificaciones de nuevos pedidos) ---
+# En desarrollo usar MAIL_MAILER=log (no envia emails reales).
+MAIL_MAILER=log
+MAIL_FROM_ADDRESS="noreply@tu-dominio.com"
+MAIL_FROM_NAME="${APP_NAME}"
 
 # --- AWS S3 (solo si MEDIA_DISK=s3) ---
 AWS_ACCESS_KEY_ID=
@@ -120,6 +141,18 @@ AWS_SECRET_ACCESS_KEY=
 AWS_DEFAULT_REGION=us-east-1
 AWS_BUCKET=
 ```
+
+### Google Maps API — Que habilitar
+
+La API key de Google Maps necesita tener habilitadas estas APIs en la [Google Cloud Console](https://console.cloud.google.com/apis):
+
+| API | Usado por | Requerida |
+|-----|-----------|-----------|
+| **Maps JavaScript API** | Mapas en panel admin (sucursales, pedidos, mapa operativo) | Si |
+| **Distance Matrix API** | Calculo de distancia real por calles (DeliveryService backend) | Si |
+| **Geocoding API** | Geocodificacion inversa (opcional, mejora precision de direcciones) | Opcional |
+
+> En desarrollo puedes usar una sola key sin restricciones. En produccion, se recomienda crear dos keys separadas: una restringida por **HTTP referrer** (para `VITE_GOOGLE_MAPS_KEY`) y otra restringida por **IP del servidor** (para `GOOGLE_MAPS_API_KEY`).
 
 ---
 
@@ -137,6 +170,18 @@ Esto inicia concurrentemente:
 - Queue worker
 - Log viewer (Pail)
 - Vite dev server con HMR
+
+### WebSockets en desarrollo
+
+Para activar el tablero Kanban en tiempo real durante desarrollo:
+
+```bash
+./vendor/bin/sail artisan reverb:start
+```
+
+Esto inicia el servidor WebSocket en `localhost:8080`. Los eventos de pedidos (`OrderCreated`, `OrderStatusChanged`, `OrderCancelled`) se transmitiran automaticamente al tablero.
+
+> Si no necesitas WebSockets durante desarrollo, la app funciona igual — los cambios simplemente no se reflejan en tiempo real (se requiere recargar la pagina).
 
 ### Comandos frecuentes
 
@@ -189,6 +234,7 @@ Se usa **PHPUnit** (no Pest). Los tests son principalmente feature tests.
 admin/
 ├── app/
 │   ├── DTOs/                  # Data Transfer Objects
+│   ├── Events/                # Eventos broadcast (OrderCreated, etc.)
 │   ├── Http/
 │   │   ├── Controllers/
 │   │   │   ├── Api/           # API publica (autenticacion por token)
@@ -197,12 +243,17 @@ admin/
 │   │   ├── Middleware/         # Tenant scope, autenticacion token
 │   │   └── Requests/          # Form Requests (validacion)
 │   ├── Models/                # Modelos Eloquent
+│   ├── Notifications/         # NewOrderNotification (email)
 │   └── Services/              # Logica de negocio
 │       ├── OrderService.php   # Creacion de pedidos, anti-tampering
 │       ├── DeliveryService.php # Calculo de delivery (Haversine + Google)
 │       ├── LimitService.php   # Limites de pedidos por periodo
 │       └── HaversineService.php # Calculo de distancia por coordenadas
 ├── bootstrap/app.php          # Registro de middleware y rutas
+├── config/
+│   ├── broadcasting.php       # Config de Reverb/WebSockets
+│   ├── reverb.php             # Config del servidor Reverb
+│   └── services.php           # API keys (Google Maps, etc.)
 ├── database/
 │   ├── factories/             # Factories para testing
 │   ├── migrations/            # Esquema de BD
@@ -210,15 +261,18 @@ admin/
 ├── resources/js/
 │   ├── Pages/                 # Paginas Vue 3 (Inertia)
 │   │   ├── Dashboard/
-│   │   ├── Orders/            # Kanban de pedidos
+│   │   ├── Orders/            # Kanban de pedidos (tiempo real)
 │   │   ├── Products/
 │   │   ├── Branches/
+│   │   ├── Map/               # Mapa operativo
+│   │   ├── Cancellations/
 │   │   ├── Settings/
 │   │   └── SuperAdmin/
 │   ├── Components/            # Componentes reutilizables
 │   └── Layouts/               # Layouts (Admin, SuperAdmin)
 ├── routes/
 │   ├── api.php                # Rutas API publica
+│   ├── channels.php           # Autorizacion de canales WebSocket
 │   └── web.php                # Rutas admin y SuperAdmin
 └── tests/Feature/             # Tests PHPUnit
 ```
@@ -246,13 +300,15 @@ curl -H "Authorization: Bearer <access_token>" \
      http://localhost/api/restaurant
 ```
 
+El `access_token` se genera automaticamente al crear un restaurante en el SuperAdmin. Puedes verlo y regenerarlo en la pagina de detalle del restaurante en el panel SuperAdmin.
+
 ---
 
 ## Arquitectura
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│                       GuisoGo SaaS                       │
+│                       PideAqui SaaS                       │
 ├──────────────────┬──────────────────┬────────────────────┤
 │  SPA Cliente     │  Panel Admin     │  Panel SuperAdmin  │
 │  (repo externo)  │  Restaurante     │  (SaaS)            │
@@ -262,6 +318,7 @@ curl -H "Authorization: Bearer <access_token>" \
          └──────────────────┴──────────────────┘
                      Backend Laravel
                      PostgreSQL 18
+                  Laravel Reverb (WebSockets)
 ```
 
 ### Multitenancy
@@ -270,6 +327,15 @@ curl -H "Authorization: Bearer <access_token>" \
 - La SPA del cliente se identifica por un **token de acceso** unico.
 - Guards separados: `web` (admin restaurante) y `superadmin` (SuperAdmin).
 - Ningun restaurante puede ver ni modificar datos de otro.
+
+### WebSockets (Tiempo Real)
+
+El tablero Kanban de pedidos se actualiza en tiempo real via Laravel Reverb:
+
+- **Canal privado:** `restaurant.{restaurantId}` (autenticado, cada admin solo escucha su restaurante)
+- **Eventos:** `OrderCreated`, `OrderStatusChanged`, `OrderCancelled`
+- Los eventos se despachan con `ShouldBroadcastNow` (sincrono, sin cola)
+- Si Reverb no esta disponible, la app funciona normalmente — los cambios requieren recargar la pagina
 
 ---
 
@@ -290,33 +356,328 @@ curl -H "Authorization: Bearer <access_token>" \
 
 ## Servicios Externos
 
-| Servicio | Uso |
-|----------|-----|
-| **Google Distance Matrix API** | Distancia real por calles. Pre-filtro Haversine minimiza llamadas. |
-| **WhatsApp (wa.me)** | Mensaje preestructurado con el pedido completo. |
-| **AWS S3** (produccion) | Imagenes de productos y logos. |
+| Servicio | Uso | Variable de entorno |
+|----------|-----|---------------------|
+| **Google Maps JavaScript API** | Mapas interactivos en panel admin | `VITE_GOOGLE_MAPS_KEY` |
+| **Google Distance Matrix API** | Distancia real por calles (backend) | `GOOGLE_MAPS_API_KEY` |
+| **WhatsApp (wa.me)** | Mensaje preestructurado con el pedido | — |
+| **AWS S3** (produccion) | Imagenes de productos y logos | `AWS_*` |
+| **SMTP** (produccion) | Notificacion email de nuevos pedidos | `MAIL_*` |
+| **Laravel Reverb** | WebSockets para tablero en tiempo real | `REVERB_*` |
 
 ---
 
 ## Despliegue a Produccion
 
-### Requisitos del servidor
+### Opcion A: Laravel Cloud (recomendado)
+
+[Laravel Cloud](https://cloud.laravel.com) es la forma mas sencilla de desplegar. Gestiona automaticamente la infraestructura, SSL, WebSockets y escalado.
+
+#### 1. Crear la aplicacion
+
+1. Conecta tu repositorio de GitHub en Laravel Cloud.
+2. Selecciona la carpeta `admin/` como root del proyecto.
+3. Configura el environment (staging o production).
+
+#### 2. Agregar base de datos
+
+1. En Resources > Databases, crea un cluster **Laravel MySQL** o **PostgreSQL**.
+2. Conectalo al environment. Cloud inyecta automaticamente `DB_*`.
+
+#### 3. Variables de entorno
+
+Cloud inyecta las variables de base de datos y WebSockets automaticamente. Solo necesitas agregar manualmente:
+
+```dotenv
+APP_NAME=PideAqui
+APP_ENV=production
+APP_DEBUG=false
+APP_TIMEZONE=America/Mexico_City
+
+# Google Maps (dos keys, o la misma si usas una sola)
+VITE_GOOGLE_MAPS_KEY=tu_api_key_frontend
+GOOGLE_MAPS_API_KEY=tu_api_key_backend
+
+# Almacenamiento
+MEDIA_DISK=s3
+AWS_ACCESS_KEY_ID=tu_access_key
+AWS_SECRET_ACCESS_KEY=tu_secret_key
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET=tu-bucket
+
+# Email (notificaciones de nuevos pedidos)
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.tu-proveedor.com
+MAIL_PORT=465
+MAIL_USERNAME=tu_usuario
+MAIL_PASSWORD=tu_contraseña
+MAIL_SCHEME=smtps
+MAIL_FROM_ADDRESS="pedidos@tu-dominio.com"
+MAIL_FROM_NAME="PideAqui"
+```
+
+#### 4. WebSockets (Reverb gestionado)
+
+1. En Resources > **WebSockets**, click **"+ New WebSocket cluster"**.
+2. Selecciona la region (misma que tu app) y el maximo de conexiones concurrentes.
+3. En el canvas de tu aplicacion, click **"Add resource" > "WebSockets"**.
+4. Cloud inyecta automaticamente todas las variables `REVERB_*` y `VITE_REVERB_*`.
+5. **Redeploy** tu aplicacion para que los cambios tomen efecto.
+
+> No necesitas correr `artisan reverb:start`. Cloud gestiona el cluster de WebSockets automaticamente.
+
+#### 5. Desplegar
+
+Haz push a tu rama principal. Cloud despliega automaticamente.
+
+---
+
+### Opcion B: Docker Compose (VPS / servidor propio)
+
+Para desplegar en un VPS con Docker Compose sin depender de Laravel Cloud.
+
+#### 1. Preparar el servidor
+
+Requisitos del servidor:
+- Docker Engine 24+
+- Docker Compose v2+
+- Dominio con DNS apuntando al servidor
+- Certificado SSL (Let's Encrypt recomendado)
+
+#### 2. Clonar y configurar
+
+```bash
+git clone https://github.com/Dayikeynes16/PideAqui.git
+cd PideAqui/admin
+cp .env.example .env
+# Editar .env con valores de produccion (ver abajo)
+```
+
+#### 3. Crear `docker-compose.prod.yml`
+
+```yaml
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - CONTAINER_ROLE=app
+    volumes:
+      - storage:/var/www/html/storage/app
+    depends_on:
+      pgsql:
+        condition: service_healthy
+    env_file: .env
+    networks:
+      - pideaqui
+
+  queue:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600
+    depends_on:
+      pgsql:
+        condition: service_healthy
+    env_file: .env
+    networks:
+      - pideaqui
+
+  reverb:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    ports:
+      - "${REVERB_PORT:-8080}:${REVERB_PORT:-8080}"
+    command: php artisan reverb:start --host=0.0.0.0 --port=${REVERB_PORT:-8080}
+    depends_on:
+      pgsql:
+        condition: service_healthy
+    env_file: .env
+    networks:
+      - pideaqui
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    command: >
+      sh -c "while true; do php artisan schedule:run --no-interaction; sleep 60; done"
+    depends_on:
+      pgsql:
+        condition: service_healthy
+    env_file: .env
+    networks:
+      - pideaqui
+
+  pgsql:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgsql-data:/var/lib/postgresql/data
+    networks:
+      - pideaqui
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-d", "${DB_DATABASE}", "-U", "${DB_USERNAME}"]
+      retries: 3
+      timeout: 5s
+
+networks:
+  pideaqui:
+    driver: bridge
+
+volumes:
+  storage:
+  pgsql-data:
+```
+
+#### 4. Crear `Dockerfile.prod`
+
+```dockerfile
+FROM php:8.5-fpm-alpine
+
+# Extensiones requeridas
+RUN apk add --no-cache \
+    postgresql-dev libpng-dev libjpeg-turbo-dev libwebp-dev \
+    nginx supervisor && \
+    docker-php-ext-configure gd --with-jpeg --with-webp && \
+    docker-php-ext-install pdo_pgsql pgsql gd bcmath opcache
+
+# Node.js para compilar assets
+RUN apk add --no-cache nodejs npm
+
+WORKDIR /var/www/html
+COPY . .
+
+# Dependencias PHP (sin dev)
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+RUN composer install --no-dev --optimize-autoloader --no-interaction
+
+# Compilar assets
+RUN npm ci && npm run build && rm -rf node_modules
+
+# Permisos
+RUN chown -R www-data:www-data storage bootstrap/cache
+
+# Config Nginx y Supervisor
+COPY docker/nginx.conf /etc/nginx/http.d/default.conf
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+EXPOSE 80
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+```
+
+> Este Dockerfile es un ejemplo de referencia. Ajusta segun las necesidades de tu infraestructura.
+
+#### 5. Variables de entorno de produccion
+
+```dotenv
+APP_NAME=PideAqui
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://tu-dominio.com
+
+DB_CONNECTION=pgsql
+DB_HOST=pgsql
+DB_PORT=5432
+DB_DATABASE=pideaqui
+DB_USERNAME=pideaqui_user
+DB_PASSWORD=contraseña_segura
+
+SESSION_DRIVER=database
+CACHE_STORE=database
+QUEUE_CONNECTION=database
+
+# Google Maps
+VITE_GOOGLE_MAPS_KEY=tu_api_key_frontend
+GOOGLE_MAPS_API_KEY=tu_api_key_backend
+
+# Almacenamiento
+MEDIA_DISK=s3
+AWS_ACCESS_KEY_ID=tu_access_key
+AWS_SECRET_ACCESS_KEY=tu_secret_key
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET=tu-bucket
+
+# WebSockets
+BROADCAST_CONNECTION=reverb
+REVERB_APP_ID=tu_app_id
+REVERB_APP_KEY=tu_app_key
+REVERB_APP_SECRET=tu_app_secret
+REVERB_HOST=tu-dominio.com        # Dominio publico donde corre Reverb
+REVERB_PORT=8080                   # Puerto expuesto (o 443 si usas proxy TLS)
+REVERB_SCHEME=https                # 'https' en produccion
+
+VITE_REVERB_APP_KEY="${REVERB_APP_KEY}"
+VITE_REVERB_HOST="${REVERB_HOST}"
+VITE_REVERB_PORT="${REVERB_PORT}"
+VITE_REVERB_SCHEME="${REVERB_SCHEME}"
+
+# Email
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.tu-proveedor.com
+MAIL_PORT=465
+MAIL_USERNAME=tu_usuario
+MAIL_PASSWORD=tu_contraseña
+MAIL_SCHEME=smtps
+MAIL_FROM_ADDRESS="pedidos@tu-dominio.com"
+MAIL_FROM_NAME="PideAqui"
+```
+
+#### 6. Desplegar
+
+```bash
+# Primera vez
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml exec app php artisan key:generate --no-interaction
+docker compose -f docker-compose.prod.yml exec app php artisan migrate --force --no-interaction
+docker compose -f docker-compose.prod.yml exec app php artisan storage:link
+
+# Actualizaciones posteriores
+git pull
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml exec app php artisan migrate --force --no-interaction
+docker compose -f docker-compose.prod.yml exec app php artisan config:cache
+docker compose -f docker-compose.prod.yml exec app php artisan route:cache
+docker compose -f docker-compose.prod.yml exec app php artisan view:cache
+```
+
+---
+
+### Opcion C: Servidor tradicional (Nginx + PHP-FPM)
+
+Para desplegar directamente en un servidor sin Docker.
+
+#### Requisitos del servidor
 
 - PHP 8.5 con extensiones: `pgsql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `json`, `bcmath`, `gd`
 - PostgreSQL 16+
 - Nginx o Apache
 - Node.js 20+ (solo para compilar assets)
-- Supervisor o systemd (para queue worker)
+- Supervisor o systemd (para queue worker y Reverb)
 - SSL/TLS (HTTPS obligatorio)
 
-### Pasos
+#### Pasos
 
 ```bash
 # 1. Clonar y configurar entorno
-git clone https://github.com/Dayikeynes16/GuisoGo.git
-cd GuisoGo/admin
+git clone https://github.com/Dayikeynes16/PideAqui.git
+cd PideAqui/admin
 cp .env.example .env
-# Editar .env con valores de produccion (ver abajo)
+# Editar .env con valores de produccion
 
 # 2. Instalar dependencias (sin dev)
 composer install --no-dev --optimize-autoloader
@@ -340,35 +701,7 @@ npm run build
 php artisan storage:link
 ```
 
-### Variables de entorno de produccion
-
-```dotenv
-APP_NAME=GuisoGo
-APP_ENV=production
-APP_DEBUG=false
-APP_URL=https://tu-dominio.com
-
-DB_CONNECTION=pgsql
-DB_HOST=tu-host-postgres
-DB_PORT=5432
-DB_DATABASE=guisogo
-DB_USERNAME=guisogo_user
-DB_PASSWORD=contraseña_segura
-
-SESSION_DRIVER=database
-CACHE_STORE=database
-QUEUE_CONNECTION=database
-
-MEDIA_DISK=s3
-AWS_ACCESS_KEY_ID=tu_access_key
-AWS_SECRET_ACCESS_KEY=tu_secret_key
-AWS_DEFAULT_REGION=us-east-1
-AWS_BUCKET=tu-bucket
-
-VITE_GOOGLE_MAPS_KEY=tu_api_key
-```
-
-### Configuracion de Nginx
+#### Configuracion de Nginx
 
 ```nginx
 server {
@@ -380,7 +713,7 @@ server {
 server {
     listen 443 ssl http2;
     server_name tu-dominio.com;
-    root /var/www/guisogo/admin/public;
+    root /var/www/pideaqui/admin/public;
 
     ssl_certificate     /etc/ssl/certs/tu-dominio.crt;
     ssl_certificate_key /etc/ssl/private/tu-dominio.key;
@@ -413,13 +746,48 @@ server {
 }
 ```
 
-### Queue Worker (systemd)
+#### Proxy Nginx para WebSockets (Reverb)
 
-Crear `/etc/systemd/system/guisogo-worker.service`:
+Si Reverb corre en el mismo servidor, agrega este bloque para exponer WebSockets via HTTPS:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name ws.tu-dominio.com;
+
+    ssl_certificate     /etc/ssl/certs/tu-dominio.crt;
+    ssl_certificate_key /etc/ssl/private/tu-dominio.key;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+        proxy_send_timeout 60s;
+    }
+}
+```
+
+Con este proxy, configura las variables de entorno asi:
+
+```dotenv
+REVERB_HOST=ws.tu-dominio.com
+REVERB_PORT=443
+REVERB_SCHEME=https
+```
+
+#### Queue Worker (systemd)
+
+Crear `/etc/systemd/system/pideaqui-worker.service`:
 
 ```ini
 [Unit]
-Description=GuisoGo Queue Worker
+Description=PideAqui Queue Worker
 After=network.target
 
 [Service]
@@ -427,28 +795,55 @@ User=www-data
 Group=www-data
 Restart=always
 RestartSec=5
-WorkingDirectory=/var/www/guisogo/admin
+WorkingDirectory=/var/www/pideaqui/admin
 ExecStart=/usr/bin/php artisan queue:work --sleep=3 --tries=3 --max-time=3600
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-```bash
-sudo systemctl enable guisogo-worker
-sudo systemctl start guisogo-worker
+#### Reverb WebSocket Server (systemd)
+
+Crear `/etc/systemd/system/pideaqui-reverb.service`:
+
+```ini
+[Unit]
+Description=PideAqui Reverb WebSocket Server
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+Restart=always
+RestartSec=5
+WorkingDirectory=/var/www/pideaqui/admin
+ExecStart=/usr/bin/php artisan reverb:start --host=0.0.0.0 --port=8080
+
+[Install]
+WantedBy=multi-user.target
 ```
+
+```bash
+sudo systemctl enable pideaqui-worker pideaqui-reverb
+sudo systemctl start pideaqui-worker pideaqui-reverb
+```
+
+---
 
 ### Checklist de produccion
 
 - [ ] `APP_ENV=production` y `APP_DEBUG=false`
 - [ ] HTTPS configurado con certificado valido
 - [ ] Base de datos PostgreSQL con backups automaticos
+- [ ] `VITE_GOOGLE_MAPS_KEY` con API key restringida por **HTTP referrer** (dominio del admin)
+- [ ] `GOOGLE_MAPS_API_KEY` con API key restringida por **IP del servidor**
 - [ ] `MEDIA_DISK=s3` con bucket S3 configurado
-- [ ] `VITE_GOOGLE_MAPS_KEY` con API key de produccion (restringida por dominio)
+- [ ] `BROADCAST_CONNECTION=reverb` con Reverb corriendo (o WebSockets managed en Laravel Cloud)
+- [ ] `MAIL_MAILER=smtp` con proveedor real configurado (si `notify_new_orders` esta activo)
 - [ ] Queue worker corriendo como servicio
+- [ ] Reverb corriendo como servicio (o gestionado por Laravel Cloud)
 - [ ] Rate limiting activo en login (`throttle:5,1`) y ordenes (`throttle:30,1`)
-- [ ] Cron job para scheduler: `* * * * * cd /var/www/guisogo/admin && php artisan schedule:run >> /dev/null 2>&1`
+- [ ] Cron job para scheduler: `* * * * * cd /var/www/pideaqui/admin && php artisan schedule:run >> /dev/null 2>&1`
 - [ ] Log rotation configurado
 - [ ] Permisos de directorio: `storage/` y `bootstrap/cache/` escribibles por `www-data`
 

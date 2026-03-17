@@ -51,7 +51,7 @@ function alertClass(percent) {
             <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
                 <h2 class="text-lg font-bold text-gray-900 mb-2">Mis límites del plan</h2>
                 <p class="text-sm text-gray-500 mb-8">
-                    Los límites son configurados por el administrador de GuisoGo. Contáctanos si necesitas ampliarlos.
+                    Los límites son configurados por el administrador de PideAqui. Contáctanos si necesitas ampliarlos.
                 </p>
 
                 <div class="space-y-8">

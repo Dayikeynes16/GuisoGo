@@ -52,7 +52,7 @@ function logout() {
                         </span>
                     </div>
                     <div>
-                        <p class="font-bold text-gray-900 text-sm leading-tight">GuisoGo</p>
+                        <p class="font-bold text-gray-900 text-sm leading-tight">PideAqui</p>
                         <p class="text-xs text-gray-400">Panel Admin</p>
                     </div>
                 </div>

@@ -65,7 +65,7 @@ function submit() {
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Slug (URL amigable)</label>
                                 <div class="flex items-center">
-                                    <span class="inline-flex items-center px-3 py-2.5 border border-r-0 border-gray-200 rounded-l-xl bg-gray-50 text-sm text-gray-500">guisogo.com/</span>
+                                    <span class="inline-flex items-center px-3 py-2.5 border border-r-0 border-gray-200 rounded-l-xl bg-gray-50 text-sm text-gray-500">pideaqui.com/</span>
                                     <input
                                         v-model="form.slug"
                                         type="text"
