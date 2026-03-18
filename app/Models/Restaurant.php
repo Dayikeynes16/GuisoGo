@@ -104,6 +104,11 @@ class Restaurant extends Model
         return $this->hasMany(Order::class);
     }
 
+    public function promotions(): HasMany
+    {
+        return $this->hasMany(Promotion::class)->orderBy('sort_order');
+    }
+
     public function schedules(): HasMany
     {
         return $this->hasMany(RestaurantSchedule::class)->orderBy('day_of_week');

@@ -3,6 +3,8 @@ import { computed } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import SettingsLayout from '@/Components/SettingsLayout.vue'
+import TimePicker from '@/Components/TimePicker.vue'
+import ToggleSwitch from '@/Components/ToggleSwitch.vue'
 
 const props = defineProps({
     schedules: Array,
@@ -68,17 +70,10 @@ function submit() {
                         </span>
 
                         <!-- Toggle -->
-                        <button
-                            type="button"
-                            @click="schedule.is_closed = !schedule.is_closed"
-                            class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none"
-                            :class="!schedule.is_closed ? 'bg-[#FF5722]' : 'bg-gray-200'"
-                        >
-                            <span
-                                class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform"
-                                :class="!schedule.is_closed ? 'translate-x-5' : 'translate-x-0'"
-                            />
-                        </button>
+                        <ToggleSwitch
+                            :model-value="!schedule.is_closed"
+                            @update:model-value="schedule.is_closed = !$event"
+                        />
 
                         <span
                             class="text-xs font-medium w-16 shrink-0"
@@ -89,17 +84,13 @@ function submit() {
 
                         <!-- Time inputs -->
                         <template v-if="!schedule.is_closed">
-                            <input
-                                v-model="schedule.opens_at"
-                                type="time"
-                                class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#FF5722]/50 w-32"
-                            />
+                            <div class="w-40">
+                                <TimePicker v-model="schedule.opens_at" placeholder="Apertura" />
+                            </div>
                             <span class="text-gray-400 text-sm">a</span>
-                            <input
-                                v-model="schedule.closes_at"
-                                type="time"
-                                class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#FF5722]/50 w-32"
-                            />
+                            <div class="w-40">
+                                <TimePicker v-model="schedule.closes_at" placeholder="Cierre" />
+                            </div>
                         </template>
                         <template v-else>
                             <span class="text-sm text-gray-400 italic">Sin horario</span>

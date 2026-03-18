@@ -11,6 +11,7 @@ use App\Models\ModifierOption;
 use App\Models\Order;
 use App\Models\PaymentMethod;
 use App\Models\Product;
+use App\Models\Promotion;
 use App\Models\Restaurant;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -105,106 +106,152 @@ class OrderService
             throw ValidationException::withMessages(['branch_id' => ['La sucursal no está activa.']]);
         }
 
-        // PASO 4 — Load and validate all requested products.
-        $productIds = collect($validated['items'])->pluck('product_id')->unique()->values();
+        // PASO 4 — Load and validate all sellable entities (products + promotions).
+        $productItems = collect($validated['items'])->filter(fn ($i) => ! empty($i['product_id']));
+        $promotionItems = collect($validated['items'])->filter(fn ($i) => ! empty($i['promotion_id']));
 
-        $products = Product::query()
-            ->where('restaurant_id', $restaurant->id)
-            ->where('is_active', true)
-            ->whereIn('id', $productIds)
-            ->get()
-            ->keyBy('id');
-
-        if ($products->count() !== $productIds->count()) {
-            throw ValidationException::withMessages(['items' => ['Uno o más productos no están disponibles.']]);
-        }
-
-        // PASO 5 — Validate modifier options per-item: each option must belong to the specific product's modifier groups.
-        $validOptions = collect();
-        foreach ($validated['items'] as $itemData) {
-            $itemOptionIds = collect($itemData['modifiers'] ?? [])->pluck('modifier_option_id')->filter()->unique()->values();
-
-            if ($itemOptionIds->isEmpty()) {
-                continue;
-            }
-
-            $itemValidOptions = ModifierOption::query()
-                ->whereIn('id', $itemOptionIds)
-                ->whereHas('modifierGroup', fn ($q) => $q->where('restaurant_id', $restaurant->id)->where('product_id', $itemData['product_id']))
+        $products = collect();
+        if ($productItems->isNotEmpty()) {
+            $productIds = $productItems->pluck('product_id')->unique()->values();
+            $products = Product::query()
+                ->where('restaurant_id', $restaurant->id)
+                ->where('is_active', true)
+                ->whereIn('id', $productIds)
+                ->with('category')
                 ->get()
                 ->keyBy('id');
 
-            if ($itemValidOptions->count() !== $itemOptionIds->count()) {
-                throw ValidationException::withMessages(['items' => ['Uno o más modificadores no son válidos para "'.$products[$itemData['product_id']]->name.'".']]);
+            if ($products->count() !== $productIds->count()) {
+                throw ValidationException::withMessages(['items' => ['Uno o más productos no están disponibles.']]);
             }
 
-            foreach ($itemValidOptions as $id => $opt) {
-                $validOptions->put($id, $opt);
+            // Validate each product's category is active and currently available (schedule).
+            foreach ($products as $product) {
+                if (! $product->category || ! $product->category->is_active) {
+                    throw ValidationException::withMessages(['items' => ['La categoría de "'.$product->name.'" no está disponible.']]);
+                }
+
+                if (! $product->category->isCurrentlyAvailable()) {
+                    throw ValidationException::withMessages(['items' => ['"'.$product->name.'" no está disponible en este horario.']]);
+                }
             }
         }
 
-        // PASO 5b — Validate required modifier groups have at least one selection per item.
-        foreach ($validated['items'] as $itemData) {
+        $promotions = collect();
+        if ($promotionItems->isNotEmpty()) {
+            $promoIds = $promotionItems->pluck('promotion_id')->unique()->values();
+            $promotions = Promotion::query()
+                ->where('restaurant_id', $restaurant->id)
+                ->where('is_active', true)
+                ->whereIn('id', $promoIds)
+                ->with(['modifierGroups.options'])
+                ->get()
+                ->filter(fn (Promotion $p) => $p->isCurrentlyActive())
+                ->keyBy('id');
+
+            if ($promotions->count() !== $promoIds->count()) {
+                throw ValidationException::withMessages(['items' => ['Una o más promociones no están disponibles.']]);
+            }
+        }
+
+        // PASO 4b — Normalize all items into a unified structure for steps 5-8.
+        // Each normalized item has: entity (model), entityName, ownerColumn, ownerId, itemData, productId, promotionId.
+        $normalizedItems = collect();
+        foreach ($productItems as $itemData) {
+            $entity = $products[$itemData['product_id']];
+            $normalizedItems->push([
+                'entity' => $entity,
+                'owner_column' => 'product_id',
+                'owner_id' => $entity->id,
+                'product_id' => $entity->id,
+                'promotion_id' => null,
+                'data' => $itemData,
+            ]);
+        }
+        foreach ($promotionItems as $itemData) {
+            $entity = $promotions[$itemData['promotion_id']];
+            $normalizedItems->push([
+                'entity' => $entity,
+                'owner_column' => 'promotion_id',
+                'owner_id' => $entity->id,
+                'product_id' => null,
+                'promotion_id' => $entity->id,
+                'data' => $itemData,
+            ]);
+        }
+
+        // PASO 5 — Validate modifier options, required groups, and single-selection groups (unified).
+        $allValidOptions = collect();
+
+        foreach ($normalizedItems as $normalized) {
+            $itemData = $normalized['data'];
+            $entity = $normalized['entity'];
+            $itemOptionIds = collect($itemData['modifiers'] ?? [])->pluck('modifier_option_id')->filter()->unique()->values();
+
+            if ($itemOptionIds->isNotEmpty()) {
+                // 5a — Validate options belong to this entity's modifier groups.
+                $itemValidOptions = ModifierOption::query()
+                    ->whereIn('id', $itemOptionIds)
+                    ->whereHas('modifierGroup', fn ($q) => $q->where('restaurant_id', $restaurant->id)->where($normalized['owner_column'], $normalized['owner_id']))
+                    ->get()
+                    ->keyBy('id');
+
+                if ($itemValidOptions->count() !== $itemOptionIds->count()) {
+                    throw ValidationException::withMessages(['items' => ['Uno o más modificadores no son válidos para "'.$entity->name.'".']]);
+                }
+
+                foreach ($itemValidOptions as $id => $opt) {
+                    $allValidOptions->put($id, $opt);
+                }
+            }
+
+            $sentOptionIds = collect($itemData['modifiers'] ?? [])->pluck('modifier_option_id')->toArray();
+
+            // 5b — Validate required modifier groups have at least one selection.
             $requiredGroups = ModifierGroup::query()
-                ->where('product_id', $itemData['product_id'])
+                ->where($normalized['owner_column'], $normalized['owner_id'])
                 ->where('restaurant_id', $restaurant->id)
                 ->where('is_required', true)
                 ->get();
 
-            if ($requiredGroups->isEmpty()) {
-                continue;
-            }
-
-            $sentOptionIds = collect($itemData['modifiers'] ?? [])->pluck('modifier_option_id')->toArray();
-
             foreach ($requiredGroups as $group) {
                 $groupOptionIds = $group->options()->pluck('id')->toArray();
-                $hasSelection = ! empty(array_intersect($sentOptionIds, $groupOptionIds));
-
-                if (! $hasSelection) {
+                if (empty(array_intersect($sentOptionIds, $groupOptionIds))) {
                     throw ValidationException::withMessages([
-                        'items' => ['El grupo de modificadores "'.$group->name.'" es obligatorio para "'.$products[$itemData['product_id']]->name.'".'],
+                        'items' => ['El grupo de modificadores "'.$group->name.'" es obligatorio para "'.$entity->name.'".'],
                     ]);
                 }
             }
-        }
 
-        // PASO 5c — Validate single-selection groups have at most one option per item.
-        foreach ($validated['items'] as $itemData) {
+            // 5c — Validate single-selection groups have at most one option.
             $singleGroups = ModifierGroup::query()
-                ->where('product_id', $itemData['product_id'])
+                ->where($normalized['owner_column'], $normalized['owner_id'])
                 ->where('restaurant_id', $restaurant->id)
                 ->where('selection_type', 'single')
                 ->get();
 
-            if ($singleGroups->isEmpty()) {
-                continue;
-            }
-
-            $sentOptionIds = collect($itemData['modifiers'] ?? [])->pluck('modifier_option_id')->toArray();
-
             foreach ($singleGroups as $group) {
                 $groupOptionIds = $group->options()->pluck('id')->toArray();
-                $matches = array_intersect($sentOptionIds, $groupOptionIds);
-
-                if (count($matches) > 1) {
+                if (count(array_intersect($sentOptionIds, $groupOptionIds)) > 1) {
                     throw ValidationException::withMessages([
-                        'items' => ['El grupo "'.$group->name.'" solo permite una opción para "'.$products[$itemData['product_id']]->name.'".'],
+                        'items' => ['El grupo "'.$group->name.'" solo permite una opción para "'.$entity->name.'".'],
                     ]);
                 }
             }
         }
 
-        // PASO 6 — Anti-tampering: validate prices match the database.
-        foreach ($validated['items'] as $itemData) {
-            $product = $products[$itemData['product_id']];
+        // PASO 6 — Anti-tampering: validate prices match the database (unified).
+        foreach ($normalizedItems as $normalized) {
+            $entity = $normalized['entity'];
+            $itemData = $normalized['data'];
+            $unitPrice = (float) $itemData['unit_price'];
 
-            if (abs((float) $itemData['unit_price'] - (float) $product->price) > 0.01) {
-                throw ValidationException::withMessages(['items' => ['El precio de "'.$product->name.'" no coincide.']]);
+            if (abs($unitPrice - (float) $entity->price) > 0.01) {
+                throw ValidationException::withMessages(['items' => ['El precio de "'.$entity->name.'" no coincide.']]);
             }
 
             foreach ($itemData['modifiers'] ?? [] as $modifierData) {
-                $option = $validOptions[$modifierData['modifier_option_id']];
+                $option = $allValidOptions[$modifierData['modifier_option_id']];
 
                 if (abs((float) $modifierData['price_adjustment'] - (float) $option->price_adjustment) > 0.01) {
                     throw ValidationException::withMessages(['items' => ['El precio del modificador "'.$option->name.'" no coincide.']]);
@@ -214,9 +261,11 @@ class OrderService
 
         // PASO 7 — Calculate totals in backend (never trust the client).
         $subtotal = 0.0;
-        foreach ($validated['items'] as $itemData) {
-            $modifierTotal = collect($itemData['modifiers'] ?? [])->sum(fn (array $m) => (float) $validOptions[$m['modifier_option_id']]->price_adjustment);
-            $subtotal += ((float) $products[$itemData['product_id']]->price + $modifierTotal) * (int) $itemData['quantity'];
+        foreach ($normalizedItems as $normalized) {
+            $entity = $normalized['entity'];
+            $itemData = $normalized['data'];
+            $modifierTotal = collect($itemData['modifiers'] ?? [])->sum(fn (array $m) => (float) $allValidOptions[$m['modifier_option_id']]->price_adjustment);
+            $subtotal += ((float) $entity->price + $modifierTotal) * (int) $itemData['quantity'];
         }
 
         // PASO 7b — Validate delivery cost against delivery ranges (distance computed server-side).
@@ -253,7 +302,7 @@ class OrderService
         }
 
         // PASO 8 — Create Order inside transaction with limit re-check (prevents TOCTOU race condition).
-        $order = DB::transaction(function () use ($validated, $restaurant, $branch, $customer, $products, $validOptions, $subtotal, $deliveryCost, $distanceKm, $total): Order {
+        $order = DB::transaction(function () use ($validated, $restaurant, $branch, $customer, $normalizedItems, $allValidOptions, $subtotal, $deliveryCost, $distanceKm, $total): Order {
             // Re-check order limit with a FOR UPDATE lock on the restaurant row.
             $lockedRestaurant = Restaurant::query()->lockForUpdate()->find($restaurant->id);
             if ($this->limitService->isOrderLimitReached($lockedRestaurant)) {
@@ -281,19 +330,23 @@ class OrderService
                 'longitude' => $validated['longitude'] ?? null,
             ]);
 
-            foreach ($validated['items'] as $itemData) {
-                $product = $products[$itemData['product_id']];
+            // Create order items (unified for products and promotions).
+            foreach ($normalizedItems as $normalized) {
+                $entity = $normalized['entity'];
+                $itemData = $normalized['data'];
+
                 $item = $order->items()->create([
-                    'product_id' => $product->id,
-                    'product_name' => $product->name,
+                    'product_id' => $normalized['product_id'],
+                    'promotion_id' => $normalized['promotion_id'],
+                    'product_name' => $entity->name,
                     'quantity' => $itemData['quantity'],
-                    'unit_price' => $product->price,
-                    'production_cost' => $product->production_cost,
+                    'unit_price' => $entity->price,
+                    'production_cost' => $entity->production_cost,
                     'notes' => $itemData['notes'] ?? null,
                 ]);
 
                 foreach ($itemData['modifiers'] ?? [] as $modifierData) {
-                    $option = $validOptions[$modifierData['modifier_option_id']];
+                    $option = $allValidOptions[$modifierData['modifier_option_id']];
                     $item->modifiers()->create([
                         'modifier_option_id' => $option->id,
                         'modifier_option_name' => $option->name,

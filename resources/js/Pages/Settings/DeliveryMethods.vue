@@ -3,6 +3,7 @@ import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
 import { computed } from 'vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import SettingsLayout from '@/Components/SettingsLayout.vue'
+import ToggleSwitch from '@/Components/ToggleSwitch.vue'
 
 const props = defineProps({
     restaurant: Object,
@@ -111,25 +112,10 @@ const activeCount = computed(() => {
                             </div>
                         </div>
                         <!-- Toggle -->
-                        <button
-                            type="button"
-                            role="switch"
-                            :aria-checked="form[method.key]"
-                            :aria-label="`${form[method.key] ? 'Desactivar' : 'Activar'} ${method.label}`"
-                            class="relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5722]/50 focus-visible:ring-offset-2"
-                            :class="[
-                                form[method.key] ? 'bg-[#FF5722]' : 'bg-gray-200',
-                                method.key === 'allows_delivery' && !has_delivery_ranges ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
-                            ]"
+                        <ToggleSwitch
+                            v-model="form[method.key]"
                             :disabled="method.key === 'allows_delivery' && !has_delivery_ranges"
-                            @click="form[method.key] = !form[method.key]"
-                        >
-                            <span
-                                class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-                                :class="form[method.key] ? 'translate-x-5' : 'translate-x-0'"
-                                aria-hidden="true"
-                            ></span>
-                        </button>
+                        />
                     </div>
 
                     <!-- Validation errors -->

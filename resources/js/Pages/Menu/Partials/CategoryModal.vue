@@ -1,6 +1,8 @@
 <script setup>
 import { useForm } from '@inertiajs/vue3'
 import { computed, watch, ref } from 'vue'
+import TimePicker from '@/Components/TimePicker.vue'
+import ToggleSwitch from '@/Components/ToggleSwitch.vue'
 
 const props = defineProps({
     show: Boolean,
@@ -13,12 +15,18 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const imagePreview = ref(null)
+const scheduleEnabled = ref(false)
+
+const DAY_LABELS = ['D', 'L', 'M', 'Mi', 'J', 'V', 'S']
 
 const form = useForm({
     name: '',
     description: '',
     is_active: true,
     image: null,
+    available_days: null,
+    available_from: null,
+    available_until: null,
 })
 
 watch(() => props.category, (cat) => {
@@ -27,11 +35,51 @@ watch(() => props.category, (cat) => {
         form.description = cat.description ?? ''
         form.is_active = cat.is_active ?? true
         imagePreview.value = cat.image_url ?? null
+        if (cat.available_days !== null && cat.available_days !== undefined) {
+            scheduleEnabled.value = true
+            form.available_days = cat.available_days.map(Number)
+            form.available_from = cat.available_from ?? null
+            form.available_until = cat.available_until ?? null
+        } else {
+            scheduleEnabled.value = false
+            form.available_days = null
+            form.available_from = null
+            form.available_until = null
+        }
     } else {
         form.reset()
         imagePreview.value = null
+        scheduleEnabled.value = false
     }
 }, { immediate: true })
+
+function toggleSchedule() {
+    scheduleEnabled.value = !scheduleEnabled.value
+    if (scheduleEnabled.value) {
+        form.available_days = []
+        form.available_from = null
+        form.available_until = null
+    } else {
+        form.available_days = null
+        form.available_from = null
+        form.available_until = null
+    }
+}
+
+function toggleDay(day) {
+    if (!form.available_days) { form.available_days = [] }
+    const idx = form.available_days.indexOf(day)
+    if (idx !== -1) {
+        form.available_days.splice(idx, 1)
+    } else {
+        form.available_days.push(day)
+        form.available_days.sort()
+    }
+}
+
+function isDaySelected(day) {
+    return form.available_days?.includes(day) ?? false
+}
 
 const isEditing = computed(() => !!props.category)
 const title = computed(() => isEditing.value ? 'Editar Categoría' : 'Nueva Categoría')
@@ -144,17 +192,70 @@ function submit() {
                             <label class="block text-sm font-medium text-gray-700 mb-1.5">
                                 Estado
                             </label>
-                            <div
-                                class="flex items-center gap-3 border border-gray-200 rounded-xl px-4 py-2.5 cursor-pointer"
-                                @click="form.is_active = !form.is_active"
-                            >
+                            <div class="flex items-center gap-3 border border-gray-200 rounded-xl px-4 py-2.5">
                                 <span class="text-sm text-gray-700">{{ form.is_active ? 'Activa' : 'Inactiva' }}</span>
-                                <div class="ml-auto w-10 h-6 rounded-full transition-colors relative"
-                                    :class="form.is_active ? 'bg-[#FF5722]' : 'bg-gray-200'">
-                                    <div class="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all"
-                                        :class="form.is_active ? 'left-5' : 'left-1'" />
+                                <div class="ml-auto">
+                                    <ToggleSwitch v-model="form.is_active" />
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- Horario de disponibilidad -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                Horario de disponibilidad
+                            </label>
+                            <div class="flex items-center gap-3 border border-gray-200 rounded-xl px-4 py-2.5">
+                                <span class="material-symbols-outlined text-gray-400 text-xl">schedule</span>
+                                <span class="text-sm text-gray-700">Restringir por horario</span>
+                                <div class="ml-auto">
+                                    <ToggleSwitch :model-value="scheduleEnabled" @update:model-value="toggleSchedule" />
+                                </div>
+                            </div>
+
+                            <Transition name="schedule">
+                                <div v-if="scheduleEnabled" class="mt-3 space-y-3">
+                                    <!-- Day selector -->
+                                    <div>
+                                        <p class="text-xs font-medium text-gray-500 mb-2">Días disponibles</p>
+                                        <div class="flex gap-1.5">
+                                            <button
+                                                v-for="(label, index) in DAY_LABELS"
+                                                :key="index"
+                                                type="button"
+                                                @click="toggleDay(index)"
+                                                class="w-9 h-9 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center"
+                                                :class="isDaySelected(index)
+                                                    ? 'bg-[#FF5722] text-white'
+                                                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'"
+                                            >
+                                                {{ label }}
+                                            </button>
+                                        </div>
+                                        <p v-if="form.errors['available_days'] || form.errors['available_days.0']" class="mt-1 text-xs text-red-500">
+                                            {{ form.errors['available_days'] || form.errors['available_days.0'] }}
+                                        </p>
+                                    </div>
+
+                                    <!-- Time range -->
+                                    <div class="flex gap-3">
+                                        <div class="flex-1">
+                                            <label class="block text-xs font-medium text-gray-500 mb-1">Desde</label>
+                                            <TimePicker v-model="form.available_from" placeholder="Inicio" :has-error="!!form.errors.available_from" />
+                                            <p v-if="form.errors.available_from" class="mt-1 text-xs text-red-500">{{ form.errors.available_from }}</p>
+                                        </div>
+                                        <div class="flex-1">
+                                            <label class="block text-xs font-medium text-gray-500 mb-1">Hasta</label>
+                                            <TimePicker v-model="form.available_until" placeholder="Fin" :has-error="!!form.errors.available_until" />
+                                            <p v-if="form.errors.available_until" class="mt-1 text-xs text-red-500">{{ form.errors.available_until }}</p>
+                                        </div>
+                                    </div>
+
+                                    <p class="text-xs text-gray-400 leading-snug">
+                                        Esta categoría solo será visible en el menú del cliente durante los días y horarios seleccionados.
+                                    </p>
+                                </div>
+                            </Transition>
                         </div>
 
                         <!-- Buttons -->
@@ -187,5 +288,17 @@ function submit() {
 }
 .modal-enter-from, .modal-leave-to {
     opacity: 0;
+}
+.schedule-enter-active, .schedule-leave-active {
+    transition: all 0.2s ease;
+    overflow: hidden;
+}
+.schedule-enter-from, .schedule-leave-to {
+    opacity: 0;
+    max-height: 0;
+}
+.schedule-enter-to, .schedule-leave-from {
+    opacity: 1;
+    max-height: 300px;
 }
 </style>

@@ -21,6 +21,7 @@ const flash = computed(() => page.props.flash)
 const navItems = [
     { name: 'Dashboard', route: 'dashboard', icon: 'dashboard' },
     { name: 'Menú Digital', route: 'menu.index', icon: 'restaurant_menu' },
+    { name: 'Promociones', route: 'promotions.index', icon: 'sell' },
     { name: 'Pedidos', route: 'orders.index', icon: 'receipt_long' },
     { name: 'Cancelaciones', route: 'cancellations.index', icon: 'cancel' },
     { name: 'Mapa', route: 'map.index', icon: 'map' },

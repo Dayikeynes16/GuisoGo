@@ -4,6 +4,7 @@ import { ref, computed } from 'vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import CategoryModal from './Partials/CategoryModal.vue'
 import ConfirmModal from '@/Components/ConfirmModal.vue'
+import ToggleSwitch from '@/Components/ToggleSwitch.vue'
 
 const props = defineProps({
     categories: Array,
@@ -417,15 +418,7 @@ function onProdDragEnd() {
                                     {{ product.production_cost ? formatPrice(product.production_cost) : '—' }}
                                 </td>
                                 <td class="px-2 py-3">
-                                    <button
-                                        @click="toggleProduct(product)"
-                                        class="w-10 h-6 rounded-full transition-colors relative"
-                                        :class="product.is_active ? 'bg-[#FF5722]' : 'bg-gray-200'"
-                                        :aria-label="`${product.is_active ? 'Desactivar' : 'Activar'} ${product.name}`"
-                                    >
-                                        <div class="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all"
-                                            :class="product.is_active ? 'left-5' : 'left-1'" />
-                                    </button>
+                                    <ToggleSwitch :model-value="product.is_active" @update:model-value="toggleProduct(product)" />
                                 </td>
                                 <td class="px-5 py-3">
                                     <div class="flex items-center gap-1">

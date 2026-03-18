@@ -26,6 +26,9 @@ class CategoryController extends Controller
 
         unset($data['image']);
 
+        // Ensure schedule fields are present (FormData omits null/empty values).
+        $this->normalizeScheduleFields($data);
+
         Category::query()->create($data);
 
         return redirect()->route('menu.index')->with('success', 'Categoría creada correctamente.');
@@ -46,6 +49,9 @@ class CategoryController extends Controller
         }
 
         unset($data['image']);
+
+        // Ensure schedule fields are present (FormData omits null/empty values).
+        $this->normalizeScheduleFields($data);
 
         $category->update($data);
 
@@ -88,5 +94,35 @@ class CategoryController extends Controller
         }
 
         return redirect()->route('menu.index');
+    }
+
+    /**
+     * Ensure schedule fields are always present in the data array.
+     * FormData drops null and empty array values, so they must be
+     * explicitly set to null when the schedule toggle is off.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function normalizeScheduleFields(array &$data): void
+    {
+        if (! array_key_exists('available_days', $data)) {
+            $data['available_days'] = null;
+        }
+
+        // Clear time fields if no days are configured.
+        if (empty($data['available_days'])) {
+            $data['available_days'] = null;
+            $data['available_from'] = null;
+            $data['available_until'] = null;
+
+            return;
+        }
+
+        // Cast day values to integers (FormData sends strings).
+        $data['available_days'] = array_values(array_unique(array_map('intval', $data['available_days'])));
+
+        // Normalize empty time strings to null.
+        $data['available_from'] = ! empty($data['available_from']) ? $data['available_from'] : null;
+        $data['available_until'] = ! empty($data['available_until']) ? $data['available_until'] : null;
     }
 }

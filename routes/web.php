@@ -14,6 +14,7 @@ use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PromotionController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardController;
 use App\Http\Controllers\SuperAdmin\ProfileController as SuperAdminProfileController;
@@ -86,6 +87,16 @@ Route::middleware(['auth', 'tenant'])->group(function (): void {
     Route::put('/menu/products/{product}', [ProductController::class, 'update'])->name('products.update');
     Route::delete('/menu/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
     Route::patch('/menu/products/{product}/toggle', [ProductController::class, 'toggle'])->name('products.toggle');
+
+    // ─── Promociones ─────────────────────────────────────────────────────────
+    Route::get('/promotions', [PromotionController::class, 'index'])->name('promotions.index');
+    Route::get('/promotions/create', [PromotionController::class, 'create'])->name('promotions.create');
+    Route::post('/promotions', [PromotionController::class, 'store'])->name('promotions.store');
+    Route::get('/promotions/{promotion}/edit', [PromotionController::class, 'edit'])->name('promotions.edit');
+    Route::put('/promotions/{promotion}', [PromotionController::class, 'update'])->name('promotions.update');
+    Route::delete('/promotions/{promotion}', [PromotionController::class, 'destroy'])->name('promotions.destroy');
+    Route::patch('/promotions/{promotion}/toggle', [PromotionController::class, 'toggle'])->name('promotions.toggle');
+    Route::patch('/promotions/reorder', [PromotionController::class, 'reorder'])->name('promotions.reorder');
 
     // ─── Sucursales ────────────────────────────────────────────────────────────
     Route::get('/branches', [BranchController::class, 'index'])->name('branches.index');

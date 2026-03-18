@@ -15,6 +15,11 @@ class MenuCategoryResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        // Virtual promotion category comes as a plain array.
+        if (is_array($this->resource)) {
+            return $this->resource;
+        }
+
         return [
             'id' => $this->id,
             'name' => $this->name,

@@ -18,6 +18,7 @@ class ModifierGroup extends Model
     protected $fillable = [
         'restaurant_id',
         'product_id',
+        'promotion_id',
         'name',
         'selection_type',
         'is_required',
@@ -40,6 +41,11 @@ class ModifierGroup extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function promotion(): BelongsTo
+    {
+        return $this->belongsTo(Promotion::class);
     }
 
     public function options(): HasMany

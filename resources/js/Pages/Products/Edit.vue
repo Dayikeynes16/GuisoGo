@@ -2,6 +2,7 @@
 import { Head, useForm, Link } from '@inertiajs/vue3'
 import { ref } from 'vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
+import ToggleSwitch from '@/Components/ToggleSwitch.vue'
 
 const props = defineProps({
     product: Object,
@@ -342,15 +343,10 @@ function submit() {
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1.5">Estado</label>
-                            <div
-                                class="flex items-center gap-3 border border-gray-200 rounded-xl px-4 py-2.5 cursor-pointer"
-                                @click="form.is_active = !form.is_active"
-                            >
+                            <div class="flex items-center gap-3 border border-gray-200 rounded-xl px-4 py-2.5">
                                 <span class="text-sm text-gray-700">{{ form.is_active ? 'Visible en menú digital' : 'Oculto del menú' }}</span>
-                                <div class="ml-auto w-10 h-6 rounded-full transition-colors relative"
-                                    :class="form.is_active ? 'bg-[#FF5722]' : 'bg-gray-200'">
-                                    <div class="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all"
-                                        :class="form.is_active ? 'left-5' : 'left-1'" />
+                                <div class="ml-auto">
+                                    <ToggleSwitch v-model="form.is_active" />
                                 </div>
                             </div>
                         </div>

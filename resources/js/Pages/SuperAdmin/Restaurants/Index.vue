@@ -64,25 +64,48 @@ function filterByStatus(value) {
                 <thead>
                     <tr class="border-b border-gray-100 bg-gray-50">
                         <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Restaurante</th>
-                        <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Pedidos periodo</th>
                         <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Sucursales</th>
-                        <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Límite pedidos</th>
+                        <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Pedidos / Limite</th>
                         <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
                         <th class="px-6 py-3"></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-50">
                     <tr v-if="restaurants.data.length === 0">
-                        <td colspan="6" class="px-6 py-10 text-center text-gray-400 text-sm">Sin restaurantes.</td>
+                        <td colspan="5" class="px-6 py-10 text-center text-gray-400 text-sm">Sin restaurantes.</td>
                     </tr>
                     <tr v-for="restaurant in restaurants.data" :key="restaurant.id" class="hover:bg-gray-50 transition-colors">
                         <td class="px-6 py-4">
                             <p class="font-semibold text-gray-900">{{ restaurant.name }}</p>
                             <p class="text-xs text-gray-400">{{ restaurant.slug }}</p>
                         </td>
-                        <td class="px-6 py-4 text-gray-700">{{ restaurant.period_orders_count ?? 0 }}</td>
                         <td class="px-6 py-4 text-gray-700">{{ restaurant.active_branch_count ?? 0 }}</td>
-                        <td class="px-6 py-4 text-gray-700">{{ restaurant.orders_limit }}</td>
+                        <td class="px-6 py-4">
+                            <template v-if="restaurant.orders_limit">
+                                <div class="flex items-center gap-2">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-baseline gap-1 mb-1">
+                                            <span class="text-sm font-semibold text-gray-900">{{ restaurant.period_orders_count ?? 0 }}</span>
+                                            <span class="text-xs text-gray-400">/ {{ restaurant.orders_limit }}</span>
+                                        </div>
+                                        <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                            <div
+                                                class="h-full rounded-full transition-all"
+                                                :class="[
+                                                    (restaurant.period_orders_count ?? 0) >= restaurant.orders_limit
+                                                        ? 'bg-red-500'
+                                                        : (restaurant.period_orders_count ?? 0) >= restaurant.orders_limit * 0.8
+                                                            ? 'bg-amber-500'
+                                                            : 'bg-[#FF5722]'
+                                                ]"
+                                                :style="{ width: Math.min(100, ((restaurant.period_orders_count ?? 0) / restaurant.orders_limit) * 100) + '%' }"
+                                            ></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                            <span v-else class="text-xs text-gray-400">Sin limite</span>
+                        </td>
                         <td class="px-6 py-4">
                             <span
                                 class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"

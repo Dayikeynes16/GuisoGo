@@ -43,12 +43,14 @@ class NewOrderNotification extends Notification
             'transfer' => 'Transferencia',
         ];
 
+        $branchName = $order->branch?->name ?? 'Sucursal eliminada';
+
         $mail = (new MailMessage)
             ->subject("Nuevo pedido {$orderNumber}")
             ->greeting("Nuevo pedido {$orderNumber}")
             ->line("**Fecha:** {$order->created_at->format('d/m/Y H:i')}")
             ->line('**Tipo de entrega:** '.($deliveryLabels[$order->delivery_type] ?? $order->delivery_type))
-            ->line("**Sucursal:** {$order->branch->name}");
+            ->line("**Sucursal:** {$branchName}");
 
         if ($order->customer) {
             $mail->line("**Cliente:** {$order->customer->name} — {$order->customer->phone}");
@@ -58,11 +60,12 @@ class NewOrderNotification extends Notification
         $mail->line('**Productos:**');
 
         foreach ($order->items as $item) {
-            $line = "• {$item->quantity}x {$item->product->name} — \${$item->unit_price}";
+            $line = "• {$item->quantity}x {$item->product_name} — \${$item->unit_price}";
 
-            $modifiers = $item->modifiers->map(
-                fn ($m) => $m->modifierOption->name
-            )->join(', ');
+            $modifiers = $item->modifiers
+                ->map(fn ($m) => $m->modifier_option_name)
+                ->filter()
+                ->join(', ');
 
             if ($modifiers) {
                 $line .= " ({$modifiers})";

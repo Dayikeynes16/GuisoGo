@@ -9,11 +9,7 @@ const props = defineProps({
 })
 
 function goBack() {
-    if (window.history.length > 1) {
-        window.history.back()
-    } else {
-        router.visit(route('orders.index'))
-    }
+    router.visit(route('orders.index'))
 }
 
 const STATUS_STEPS = [

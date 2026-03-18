@@ -3,6 +3,7 @@ import { Head, useForm } from '@inertiajs/vue3'
 import { ref } from 'vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import SettingsLayout from '@/Components/SettingsLayout.vue'
+import ToggleSwitch from '@/Components/ToggleSwitch.vue'
 
 const props = defineProps({
     payment_methods: Array,
@@ -72,17 +73,7 @@ function save(pm) {
                             </div>
                         </div>
                         <!-- Toggle -->
-                        <button
-                            type="button"
-                            class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-[#FF5722]/50"
-                            :class="forms[pm.id].is_active ? 'bg-[#FF5722]' : 'bg-gray-200'"
-                            @click="forms[pm.id].is_active = !forms[pm.id].is_active"
-                        >
-                            <span
-                                class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-                                :class="forms[pm.id].is_active ? 'translate-x-5' : 'translate-x-0'"
-                            ></span>
-                        </button>
+                        <ToggleSwitch v-model="forms[pm.id].is_active" />
                     </div>
 
                     <!-- Error: cannot deactivate last method -->

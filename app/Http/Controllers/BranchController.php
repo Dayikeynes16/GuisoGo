@@ -88,7 +88,7 @@ class BranchController extends Controller
     {
         $this->authorize('delete', $branch);
 
-        if ($branch->orders()->whereIn('status', ['pending', 'confirmed', 'preparing'])->exists()) {
+        if ($branch->orders()->whereNotIn('status', ['delivered', 'cancelled'])->exists()) {
             return redirect()->route('branches.index')->with('error', 'No puedes eliminar una sucursal con pedidos activos.');
         }
 

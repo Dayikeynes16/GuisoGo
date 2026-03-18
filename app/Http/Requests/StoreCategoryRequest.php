@@ -22,6 +22,10 @@ class StoreCategoryRequest extends FormRequest
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['boolean'],
             'image' => ['nullable', 'image', 'mimes:jpeg,jpg,png,gif,webp', 'max:5120'],
+            'available_days' => ['nullable', 'array'],
+            'available_days.*' => ['integer', 'between:0,6'],
+            'available_from' => ['nullable', 'date_format:H:i'],
+            'available_until' => ['nullable', 'date_format:H:i'],
         ];
     }
 
@@ -32,6 +36,9 @@ class StoreCategoryRequest extends FormRequest
             'image.image' => 'El archivo debe ser una imagen válida.',
             'image.mimes' => 'La imagen debe ser de tipo: JPG, PNG, GIF o WebP.',
             'image.max' => 'La imagen no debe pesar más de 5 MB.',
+            'available_days.*.between' => 'Día de la semana inválido.',
+            'available_from.date_format' => 'El formato de hora debe ser HH:MM.',
+            'available_until.date_format' => 'El formato de hora debe ser HH:MM.',
         ];
     }
 }

@@ -11,32 +11,37 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 
-class Category extends Model
+class Promotion extends Model
 {
-    /** @use HasFactory<\Database\Factories\CategoryFactory> */
+    /** @use HasFactory<\Database\Factories\PromotionFactory> */
     use BelongsToTenant, HasFactory;
 
     protected $fillable = [
         'restaurant_id',
         'name',
         'description',
+        'price',
+        'production_cost',
         'image_path',
-        'sort_order',
         'is_active',
-        'available_days',
-        'available_from',
-        'available_until',
+        'active_days',
+        'starts_at',
+        'ends_at',
+        'sort_order',
     ];
 
     protected function casts(): array
     {
         return [
-            'sort_order' => 'integer',
+            'price' => 'decimal:2',
+            'production_cost' => 'decimal:2',
             'is_active' => 'boolean',
-            'available_days' => 'array',
+            'active_days' => 'array',
+            'sort_order' => 'integer',
         ];
     }
 
+    /** @var list<string> */
     protected $appends = ['image_url'];
 
     protected function imageUrl(): Attribute
@@ -53,39 +58,33 @@ class Category extends Model
         return $this->belongsTo(Restaurant::class);
     }
 
-    public function products(): HasMany
+    public function modifierGroups(): HasMany
     {
-        return $this->hasMany(Product::class)->orderBy('sort_order');
+        return $this->hasMany(ModifierGroup::class)->orderBy('sort_order');
     }
 
-    public function isCurrentlyAvailable(): bool
+    public function isCurrentlyActive(): bool
     {
         if (! $this->is_active) {
             return false;
         }
 
-        // No schedule restriction — always available.
-        if ($this->available_days === null) {
-            return true;
-        }
-
         $now = Carbon::now();
 
-        if (! in_array($now->dayOfWeek, $this->available_days)) {
+        if (! in_array($now->dayOfWeek, $this->active_days ?? [])) {
             return false;
         }
 
-        if (! $this->available_from || ! $this->available_until) {
+        if (! $this->starts_at || ! $this->ends_at) {
             return true;
         }
 
         $currentTime = $now->format('H:i');
 
-        // Overnight support (e.g. 20:00–02:00).
-        if ($this->available_from > $this->available_until) {
-            return $currentTime >= $this->available_from || $currentTime <= $this->available_until;
+        if ($this->starts_at > $this->ends_at) {
+            return $currentTime >= $this->starts_at || $currentTime <= $this->ends_at;
         }
 
-        return $currentTime >= $this->available_from && $currentTime <= $this->available_until;
+        return $currentTime >= $this->starts_at && $currentTime <= $this->ends_at;
     }
 }

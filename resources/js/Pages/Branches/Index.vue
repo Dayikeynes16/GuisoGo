@@ -3,6 +3,7 @@ import { Head, Link, router } from '@inertiajs/vue3'
 import { ref, computed } from 'vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import ConfirmModal from '@/Components/ConfirmModal.vue'
+import ToggleSwitch from '@/Components/ToggleSwitch.vue'
 
 const props = defineProps({
     branches: Array,
@@ -150,15 +151,11 @@ const deleteBranchMessage = computed(() =>
                                 >
                                     <span class="material-symbols-outlined text-lg">edit</span>
                                 </Link>
-                                <button
-                                    @click="toggleBranch(branch)"
+                                <ToggleSwitch
+                                    :model-value="branch.is_active"
                                     :disabled="isLastActive(branch)"
-                                    class="p-2 rounded-xl transition-colors"
-                                    :class="isLastActive(branch) ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-50'"
-                                    :title="isLastActive(branch) ? 'No puedes desactivar la última sucursal activa' : (branch.is_active ? 'Desactivar' : 'Activar')"
-                                >
-                                    <span class="material-symbols-outlined text-lg">{{ branch.is_active ? 'toggle_on' : 'toggle_off' }}</span>
-                                </button>
+                                    @update:model-value="toggleBranch(branch)"
+                                />
                                 <button
                                     @click="deleteBranch(branch)"
                                     :disabled="isLastActive(branch)"

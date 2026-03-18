@@ -37,7 +37,8 @@ class StoreOrderRequest extends FormRequest
             'cash_amount' => ['nullable', 'numeric', 'min:0.01', 'max:99999.99', 'prohibited_unless:payment_method,cash'],
 
             'items' => ['required', 'array', 'min:1', 'max:50'],
-            'items.*.product_id' => ['required', 'integer', 'min:1'],
+            'items.*.product_id' => ['nullable', 'integer', 'min:1', 'required_without:items.*.promotion_id'],
+            'items.*.promotion_id' => ['nullable', 'integer', 'min:1', 'required_without:items.*.product_id'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:100'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0', 'max:99999.99'],
             'items.*.notes' => ['nullable', 'string', 'max:255'],
@@ -52,6 +53,8 @@ class StoreOrderRequest extends FormRequest
     {
         return [
             'customer.phone.regex' => 'El teléfono debe ser de exactamente 10 dígitos numéricos.',
+            'items.*.product_id.required_without' => 'Cada item debe tener un producto o una promoción.',
+            'items.*.promotion_id.required_without' => 'Cada item debe tener un producto o una promoción.',
         ];
     }
 }

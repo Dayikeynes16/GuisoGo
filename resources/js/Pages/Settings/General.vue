@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import SettingsLayout from '@/Components/SettingsLayout.vue'
+import ToggleSwitch from '@/Components/ToggleSwitch.vue'
 
 const props = defineProps({
     restaurant: Object,
@@ -130,19 +131,7 @@ function onLogoChange(e) {
                         <p class="text-sm font-semibold text-gray-700 mb-4">Notificaciones</p>
 
                         <label class="flex items-center gap-3 cursor-pointer">
-                            <button
-                                type="button"
-                                role="switch"
-                                :aria-checked="form.notify_new_orders"
-                                @click="form.notify_new_orders = !form.notify_new_orders"
-                                class="relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#FF5722]/50"
-                                :class="form.notify_new_orders ? 'bg-[#FF5722]' : 'bg-gray-200'"
-                            >
-                                <span
-                                    class="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform duration-200"
-                                    :class="form.notify_new_orders ? 'translate-x-5' : 'translate-x-0'"
-                                />
-                            </button>
+                            <ToggleSwitch v-model="form.notify_new_orders" />
                             <span class="text-sm text-gray-700">Recibir correo cuando entre un nuevo pedido</span>
                         </label>
                     </div>
