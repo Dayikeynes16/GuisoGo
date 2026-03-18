@@ -34,7 +34,7 @@ class StoreOrderRequest extends FormRequest
 
             'scheduled_at' => ['nullable', 'date', 'after:now'],
             'payment_method' => ['required', 'in:cash,terminal,transfer'],
-            'cash_amount' => ['nullable', 'numeric', 'min:0.01', 'max:99999.99', 'prohibited_unless:payment_method,cash'],
+            'cash_amount' => ['nullable', 'numeric', 'min:0.01', 'max:100000', 'prohibited_unless:payment_method,cash'],
 
             'items' => ['required', 'array', 'min:1', 'max:50'],
             'items.*.product_id' => ['nullable', 'integer', 'min:1', 'required_without:items.*.promotion_id'],
@@ -52,9 +52,11 @@ class StoreOrderRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'customer.phone.regex' => 'El teléfono debe ser de exactamente 10 dígitos numéricos.',
-            'items.*.product_id.required_without' => 'Cada item debe tener un producto o una promoción.',
-            'items.*.promotion_id.required_without' => 'Cada item debe tener un producto o una promoción.',
+            'customer.phone.regex' => 'El telefono debe ser de exactamente 10 digitos numericos.',
+            'cash_amount.max' => 'El monto maximo de pago en efectivo es $100,000.',
+            'cash_amount.min' => 'El monto debe ser mayor a cero.',
+            'items.*.product_id.required_without' => 'Cada item debe tener un producto o una promocion.',
+            'items.*.promotion_id.required_without' => 'Cada item debe tener un producto o una promocion.',
         ];
     }
 }

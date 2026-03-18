@@ -383,7 +383,7 @@ class OrderService
         $deliveryLine = match ($order->delivery_type) {
             'delivery' => '🚗 *A domicilio*',
             'pickup' => '🏪 *Recoger en local*',
-            'dine_in' => '🍴 *Comer en local*',
+            'dine_in' => '🏪 *Comer en local*',
             default => '',
         };
 
@@ -392,7 +392,7 @@ class OrderService
             '',
             $deliveryLine,
             '',
-            '📝 *Mi pedido:*',
+            '🛒 *Mi pedido:*',
         ];
 
         foreach ($order->items as $item) {
@@ -433,13 +433,13 @@ class OrderService
         }
 
         $lines[] = '';
-        $lines[] = '💰 *Subtotal:* $'.number_format((float) $order->subtotal, 2);
+        $lines[] = '*Subtotal:* $'.number_format((float) $order->subtotal, 2);
 
         if ($order->delivery_type === 'delivery') {
-            $lines[] = '🚚 *Envio:* $'.number_format((float) $order->delivery_cost, 2);
+            $lines[] = '*Envio:* $'.number_format((float) $order->delivery_cost, 2);
         }
 
-        $lines[] = '✅ *Total:* $'.number_format((float) $order->total, 2);
+        $lines[] = '*Total:* $'.number_format((float) $order->total, 2);
         $lines[] = '';
 
         $paymentLabel = match ($order->payment_method) {
@@ -452,10 +452,10 @@ class OrderService
         $lines[] = "💳 *Pago:* {$paymentLabel}";
 
         if ($order->payment_method === 'cash' && $order->cash_amount) {
-            $lines[] = '💵 *Paga con:* $'.number_format((float) $order->cash_amount, 2);
+            $lines[] = '*Paga con:* $'.number_format((float) $order->cash_amount, 2);
             $change = (float) $order->cash_amount - (float) $order->total;
             if ($change > 0) {
-                $lines[] = '🔄 *Cambio:* $'.number_format($change, 2);
+                $lines[] = '*Cambio:* $'.number_format($change, 2);
             }
         }
 
@@ -467,23 +467,23 @@ class OrderService
 
             if ($transferPm) {
                 if ($transferPm->bank_name) {
-                    $lines[] = "🏦 *Banco:* {$transferPm->bank_name}";
+                    $lines[] = "*Banco:* {$transferPm->bank_name}";
                 }
                 if ($transferPm->account_holder) {
-                    $lines[] = "👤 *Titular:* {$transferPm->account_holder}";
+                    $lines[] = "*Titular:* {$transferPm->account_holder}";
                 }
                 if ($transferPm->clabe) {
-                    $lines[] = "📋 *CLABE:* {$transferPm->clabe}";
+                    $lines[] = "*CLABE:* {$transferPm->clabe}";
                 }
             }
         }
 
         if ($order->scheduled_at) {
-            $lines[] = '⏰ *Hora programada:* '.$order->scheduled_at->format('H:i');
+            $lines[] = '🕐 *Hora programada:* '.$order->scheduled_at->format('H:i');
         }
 
         $lines[] = '';
-        $lines[] = 'Gracias! 🙌';
+        $lines[] = 'Gracias!';
 
         return implode("\n", $lines);
     }
