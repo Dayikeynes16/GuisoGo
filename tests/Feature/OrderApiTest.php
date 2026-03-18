@@ -308,7 +308,7 @@ class OrderApiTest extends TestCase
         $this->assertStringContainsString('Taco de Bistec', $message);
         $this->assertStringContainsString('$50.00', $message);  // 2 × $25
         $this->assertStringContainsString('$80.00', $message);  // total
-        $this->assertStringContainsString('🛵', $message);
+        $this->assertStringContainsString('A domicilio', $message);
     }
 
     public function test_order_number_is_zero_padded(): void

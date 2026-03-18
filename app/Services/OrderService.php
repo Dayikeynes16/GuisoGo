@@ -381,9 +381,9 @@ class OrderService
     private function buildWhatsAppMessage(Order $order): string
     {
         $deliveryLine = match ($order->delivery_type) {
-            'delivery' => '🛵 *A domicilio*',
-            'pickup' => '🏃 *Recoger en local*',
-            'dine_in' => '🍴 *Comer aquí*',
+            'delivery' => '🚗 *A domicilio*',
+            'pickup' => '🏪 *Recoger en local*',
+            'dine_in' => '🍴 *Comer en local*',
             default => '',
         };
 
@@ -421,14 +421,14 @@ class OrderService
         if ($order->delivery_type === 'delivery' && $order->address_street) {
             $address = "{$order->address_street} #{$order->address_number}, Col. {$order->address_colony}";
             $lines[] = '';
-            $lines[] = "📍 *Dirección:* {$address}";
+            $lines[] = "📍 *Direccion:* {$address}";
 
             if ($order->address_references) {
                 $lines[] = "*Referencias:* {$order->address_references}";
             }
 
             if ($order->latitude && $order->longitude) {
-                $lines[] = "📌 *Ubicación:* https://maps.google.com/?q={$order->latitude},{$order->longitude}";
+                $lines[] = "📌 *Ubicacion:* https://maps.google.com/?q={$order->latitude},{$order->longitude}";
             }
         }
 
@@ -436,7 +436,7 @@ class OrderService
         $lines[] = '💰 *Subtotal:* $'.number_format((float) $order->subtotal, 2);
 
         if ($order->delivery_type === 'delivery') {
-            $lines[] = '🚚 *Envío:* $'.number_format((float) $order->delivery_cost, 2);
+            $lines[] = '🚚 *Envio:* $'.number_format((float) $order->delivery_cost, 2);
         }
 
         $lines[] = '✅ *Total:* $'.number_format((float) $order->total, 2);
@@ -483,7 +483,7 @@ class OrderService
         }
 
         $lines[] = '';
-        $lines[] = '¡Gracias! 🙌';
+        $lines[] = 'Gracias! 🙌';
 
         return implode("\n", $lines);
     }
