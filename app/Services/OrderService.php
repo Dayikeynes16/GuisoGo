@@ -45,7 +45,9 @@ class OrderService
 
         // PASO 1c — Validate restaurant is currently open (or order is scheduled within operating hours).
         $restaurant->load('schedules');
-        $scheduledAt = isset($validated['scheduled_at']) ? Carbon::parse($validated['scheduled_at']) : null;
+        $scheduledAt = isset($validated['scheduled_at'])
+            ? Carbon::parse($validated['scheduled_at'], config('app.timezone'))
+            : null;
 
         if ($scheduledAt) {
             // Validate scheduled_at falls within the restaurant's schedule for that day.
