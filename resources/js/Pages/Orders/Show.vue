@@ -6,6 +6,7 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 const props = defineProps({
     order: Object,
     mapsKey: { type: String, default: '' },
+    is_admin: { type: Boolean, default: true },
 })
 
 function goBack() {
@@ -298,13 +299,13 @@ function whatsappHref(phone) {
                                     <span class="text-gray-700">{{ mod.modifier_option_name || mod.modifier_option?.name }}</span>
                                     <div class="flex gap-3 text-xs shrink-0 ml-4">
                                         <span v-if="parseFloat(mod.price_adjustment) > 0" class="text-gray-500">+{{ formatPrice(mod.price_adjustment) }}</span>
-                                        <span class="text-red-400">costo {{ formatPrice(mod.production_cost ?? 0) }}</span>
+                                        <span v-if="is_admin" class="text-red-400">costo {{ formatPrice(mod.production_cost ?? 0) }}</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Costo de producción -->
-                            <div class="rounded-lg bg-red-50/60 px-3 py-2.5 space-y-1">
+                            <!-- Costo de producción (admin only) -->
+                            <div v-if="is_admin" class="rounded-lg bg-red-50/60 px-3 py-2.5 space-y-1">
                                 <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Costo de producción</p>
                                 <div class="flex justify-between text-sm">
                                     <span class="text-gray-600">Producto base</span>
@@ -320,8 +321,8 @@ function whatsappHref(phone) {
                                 </div>
                             </div>
 
-                            <!-- Ganancia del item -->
-                            <div class="flex justify-between items-center rounded-lg bg-green-50/60 px-3 py-2 text-sm font-bold">
+                            <!-- Ganancia del item (admin only) -->
+                            <div v-if="is_admin" class="flex justify-between items-center rounded-lg bg-green-50/60 px-3 py-2 text-sm font-bold">
                                 <span class="text-green-800">Ganancia del item</span>
                                 <span class="text-green-700">{{ formatPrice(itemProfit(item)) }}</span>
                             </div>
@@ -356,17 +357,17 @@ function whatsappHref(phone) {
                             <span>{{ formatPrice(order.total) }}</span>
                         </div>
 
-                        <!-- Costos -->
-                        <div class="flex justify-between text-sm text-red-600 mt-3">
-                            <span>Costo total de producción</span>
-                            <span class="font-semibold">-{{ formatPrice(totalProductionCost) }}</span>
-                        </div>
-
-                        <!-- Ganancia -->
-                        <div class="flex justify-between items-center rounded-lg bg-green-50 px-4 py-3 mt-2">
-                            <span class="text-green-800 font-bold">Ganancia bruta</span>
-                            <span class="text-green-700 text-lg font-black">{{ formatPrice(totalProfit) }}</span>
-                        </div>
+                        <!-- Costos + Ganancia (admin only) -->
+                        <template v-if="is_admin">
+                            <div class="flex justify-between text-sm text-red-600 mt-3">
+                                <span>Costo total de produccion</span>
+                                <span class="font-semibold">-{{ formatPrice(totalProductionCost) }}</span>
+                            </div>
+                            <div class="flex justify-between items-center rounded-lg bg-green-50 px-4 py-3 mt-2">
+                                <span class="text-green-800 font-bold">Ganancia bruta</span>
+                                <span class="text-green-700 text-lg font-black">{{ formatPrice(totalProfit) }}</span>
+                            </div>
+                        </template>
 
                         <!-- Método de pago -->
                         <div class="flex justify-between text-sm text-gray-500 mt-3 border-t border-gray-100 pt-3">
@@ -476,6 +477,52 @@ function whatsappHref(phone) {
                         <div v-if="order.scheduled_at" class="flex flex-col gap-1">
                             <p class="text-sm font-bold text-gray-500">Programado para</p>
                             <p class="text-gray-800">{{ formatDateTime(order.scheduled_at) }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Historial de acciones (audit trail) -->
+                <div v-if="order.events?.length" class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-[#FF5722]">history</span>
+                        Historial
+                    </h3>
+                    <div class="space-y-3">
+                        <div
+                            v-for="event in order.events"
+                            :key="event.id"
+                            class="flex items-start gap-3"
+                        >
+                            <div class="mt-0.5 shrink-0">
+                                <div
+                                    class="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs"
+                                    :class="{
+                                        'bg-blue-500': event.action === 'created',
+                                        'bg-[#FF5722]': event.action === 'status_changed',
+                                        'bg-red-500': event.action === 'cancelled',
+                                    }"
+                                >
+                                    <span class="material-symbols-outlined text-sm">
+                                        {{ event.action === 'created' ? 'add' : event.action === 'cancelled' ? 'cancel' : 'arrow_forward' }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium text-gray-900">
+                                    <template v-if="event.action === 'created'">Pedido creado</template>
+                                    <template v-else-if="event.action === 'cancelled'">Pedido cancelado</template>
+                                    <template v-else>
+                                        {{ event.from_status }} → {{ event.to_status }}
+                                    </template>
+                                </p>
+                                <p class="text-xs text-gray-500">
+                                    {{ event.user ? event.user.name : 'Cliente (API)' }}
+                                    · {{ formatDateTime(event.created_at) }}
+                                </p>
+                                <p v-if="event.metadata?.reason" class="text-xs text-red-500 mt-0.5">
+                                    Motivo: {{ event.metadata.reason }}
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>

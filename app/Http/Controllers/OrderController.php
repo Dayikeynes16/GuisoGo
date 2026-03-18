@@ -8,6 +8,7 @@ use App\Http\Requests\AdvanceOrderStatusRequest;
 use App\Http\Requests\CancelOrderRequest;
 use App\Models\Branch;
 use App\Models\Order;
+use App\Models\OrderEvent;
 use App\Services\LimitService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -29,19 +30,26 @@ class OrderController extends Controller
     {
         $this->authorize('viewAny', Order::class);
 
-        $restaurantId = $request->user()->restaurant_id;
+        $user = $request->user();
+        $restaurantId = $user->restaurant_id;
+        $allowedBranches = $user->allowedBranchIds();
 
-        // Default to today when no date filters are provided
         $dateFrom = $request->date_from ?? now()->toDateString();
         $dateTo = $request->date_to ?? $dateFrom;
 
         $query = Order::with(['customer:id,name,phone', 'branch:id,name'])
             ->when($request->branch_id, fn ($q, $id) => $q->where('branch_id', $id))
+            ->when($allowedBranches !== null, fn ($q) => $q->whereIn('branch_id', $allowedBranches))
             ->whereDate('created_at', '>=', $dateFrom)
             ->whereDate('created_at', '<=', $dateTo)
             ->latest();
 
         $orders = $query->get()->groupBy('status');
+
+        // Operators only see their assigned branches in the filter dropdown.
+        $branches = Branch::where('restaurant_id', $restaurantId)
+            ->when($allowedBranches !== null, fn ($q) => $q->whereIn('id', $allowedBranches))
+            ->get(['id', 'name']);
 
         return Inertia::render('Orders/Index', [
             'orders' => [
@@ -50,26 +58,27 @@ class OrderController extends Controller
                 'on_the_way' => $orders->get('on_the_way', collect())->values(),
                 'delivered' => $orders->get('delivered', collect())->values(),
             ],
-            'branches' => Branch::where('restaurant_id', $restaurantId)->get(['id', 'name']),
+            'branches' => $branches,
             'filters' => [
                 'branch_id' => $request->branch_id,
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
             ],
-            'monthly_count' => $this->limitService->orderCountInPeriod($request->user()->restaurant),
-            'orders_limit' => $request->user()->restaurant->orders_limit,
+            'monthly_count' => $this->limitService->orderCountInPeriod($user->restaurant),
+            'orders_limit' => $user->restaurant->orders_limit,
         ]);
     }
 
-    public function show(Order $order): Response
+    public function show(Request $request, Order $order): Response
     {
         $this->authorize('view', $order);
 
-        $order->load(['customer', 'branch', 'items.modifiers']);
+        $order->load(['customer', 'branch', 'items.modifiers', 'events.user']);
 
         return Inertia::render('Orders/Show', [
             'order' => $order,
             'mapsKey' => config('services.google_maps.key', ''),
+            'is_admin' => $request->user()->isAdmin(),
         ]);
     }
 
@@ -89,6 +98,16 @@ class OrderController extends Controller
 
         $previousStatus = $order->status;
         $order->update(['status' => $nextStatus]);
+
+        // Audit trail
+        OrderEvent::create([
+            'order_id' => $order->id,
+            'user_id' => $request->user()->id,
+            'action' => 'status_changed',
+            'from_status' => $previousStatus,
+            'to_status' => $nextStatus,
+        ]);
+
         $order->load(['customer:id,name,phone', 'branch:id,name']);
 
         try {
@@ -110,6 +129,17 @@ class OrderController extends Controller
             'cancellation_reason' => $request->validated('cancellation_reason'),
             'cancelled_at' => now(),
         ]);
+
+        // Audit trail
+        OrderEvent::create([
+            'order_id' => $order->id,
+            'user_id' => $request->user()->id,
+            'action' => 'cancelled',
+            'from_status' => $previousStatus,
+            'to_status' => 'cancelled',
+            'metadata' => ['reason' => $request->validated('cancellation_reason')],
+        ]);
+
         $order->load(['customer:id,name,phone', 'branch:id,name']);
 
         try {
@@ -123,10 +153,14 @@ class OrderController extends Controller
 
     public function newCount(Request $request): JsonResponse
     {
-        return response()->json([
-            'count' => Order::where('restaurant_id', $request->user()->restaurant_id)
-                ->where('status', 'received')
-                ->count(),
-        ]);
+        $user = $request->user();
+        $allowedBranches = $user->allowedBranchIds();
+
+        $count = Order::where('restaurant_id', $user->restaurant_id)
+            ->where('status', 'received')
+            ->when($allowedBranches !== null, fn ($q) => $q->whereIn('branch_id', $allowedBranches))
+            ->count();
+
+        return response()->json(['count' => $count]);
     }
 }

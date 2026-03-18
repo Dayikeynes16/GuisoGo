@@ -1,24 +1,27 @@
 <script setup>
-import { useForm, Head, Link, usePage } from '@inertiajs/vue3'
-import { computed } from 'vue'
+import { useForm, Head, Link } from '@inertiajs/vue3'
 
-const flash = computed(() => usePage().props.flash)
+const props = defineProps({
+    token: String,
+    email: String,
+})
 
 const form = useForm({
-    email: '',
+    token: props.token,
+    email: props.email,
     password: '',
-    remember: false,
+    password_confirmation: '',
 })
 
 function submit() {
-    form.post('/login', {
-        onFinish: () => form.reset('password'),
+    form.post(route('password.update'), {
+        onFinish: () => form.reset('password', 'password_confirmation'),
     })
 }
 </script>
 
 <template>
-    <Head title="Iniciar sesión" />
+    <Head title="Nueva contrasena" />
 
     <div class="min-h-screen bg-[#FAFAFA] flex items-center justify-center p-4">
         <div class="w-full max-w-md">
@@ -31,78 +34,79 @@ function submit() {
                     </span>
                 </div>
                 <h1 class="text-2xl font-bold text-gray-900 tracking-tight">PideAqui</h1>
-                <p class="text-sm text-gray-500 mt-1">Panel de administración</p>
+                <p class="text-sm text-gray-500 mt-1">Restablecer contrasena</p>
             </div>
 
             <!-- Card -->
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-                <!-- Success flash (e.g. after password reset) -->
-                <div v-if="flash?.success" class="bg-green-50 border border-green-200 text-green-700 text-sm rounded-xl px-4 py-3 mb-4">
-                    {{ flash.success }}
-                </div>
-
-                <h2 class="text-lg font-semibold text-gray-900 mb-6">Iniciar sesion</h2>
+                <h2 class="text-lg font-semibold text-gray-900 mb-2">Nueva contrasena</h2>
+                <p class="text-sm text-gray-500 mb-6">Ingresa tu nueva contrasena para recuperar el acceso a tu cuenta.</p>
 
                 <form @submit.prevent="submit" class="space-y-5">
 
-                    <!-- Email -->
+                    <!-- Email (readonly, prefilled from URL) -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1.5">
-                            Correo electrónico
+                            Correo electronico
                         </label>
                         <input
                             v-model="form.email"
                             type="email"
                             autocomplete="email"
                             required
-                            class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#FF5722]/30 focus:border-[#FF5722] transition-colors"
-                            :class="{ 'border-red-400': form.errors.email }"
-                            placeholder="admin@restaurante.com"
+                            readonly
+                            class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-500 bg-gray-50 cursor-not-allowed"
                         />
                         <p v-if="form.errors.email" class="mt-1 text-xs text-red-500">{{ form.errors.email }}</p>
                     </div>
 
-                    <!-- Password -->
+                    <!-- New password -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1.5">
-                            Contraseña
+                            Nueva contrasena
                         </label>
                         <input
                             v-model="form.password"
                             type="password"
-                            autocomplete="current-password"
+                            autocomplete="new-password"
                             required
+                            autofocus
                             class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#FF5722]/30 focus:border-[#FF5722] transition-colors"
                             :class="{ 'border-red-400': form.errors.password }"
-                            placeholder="••••••••"
+                            placeholder="Minimo 8 caracteres"
                         />
                         <p v-if="form.errors.password" class="mt-1 text-xs text-red-500">{{ form.errors.password }}</p>
                     </div>
 
-                    <!-- Remember + Forgot -->
-                    <div class="flex items-center justify-between">
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input
-                                v-model="form.remember"
-                                type="checkbox"
-                                class="w-4 h-4 rounded border-gray-300 text-[#FF5722] focus:ring-[#FF5722]/30"
-                            />
-                            <span class="text-sm text-gray-600">Recordarme</span>
+                    <!-- Confirm password -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                            Confirmar contrasena
                         </label>
-                        <Link :href="route('password.request')" class="text-xs text-[#FF5722] hover:text-[#D84315] font-medium transition-colors">
-                            Olvide mi contrasena
-                        </Link>
+                        <input
+                            v-model="form.password_confirmation"
+                            type="password"
+                            autocomplete="new-password"
+                            required
+                            class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#FF5722]/30 focus:border-[#FF5722] transition-colors"
+                            placeholder="Repite tu nueva contrasena"
+                        />
                     </div>
 
-                    <!-- Submit -->
                     <button
                         type="submit"
                         :disabled="form.processing"
                         class="w-full bg-[#FF5722] hover:bg-[#D84315] text-white font-semibold rounded-xl py-2.5 text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                        {{ form.processing ? 'Iniciando sesión…' : 'Iniciar sesión' }}
+                        {{ form.processing ? 'Restableciendo...' : 'Restablecer contrasena' }}
                     </button>
                 </form>
+
+                <div class="mt-6 text-center">
+                    <Link :href="route('login')" class="text-sm text-gray-500 hover:text-gray-700 font-medium transition-colors">
+                        Volver al inicio de sesion
+                    </Link>
+                </div>
             </div>
 
         </div>

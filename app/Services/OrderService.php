@@ -9,6 +9,7 @@ use App\Models\DeliveryRange;
 use App\Models\ModifierGroup;
 use App\Models\ModifierOption;
 use App\Models\Order;
+use App\Models\OrderEvent;
 use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\Promotion;
@@ -357,6 +358,15 @@ class OrderService
                     ]);
                 }
             }
+
+            // Audit trail: order created (no user_id — created by client via API).
+            OrderEvent::create([
+                'order_id' => $order->id,
+                'user_id' => null,
+                'action' => 'created',
+                'from_status' => null,
+                'to_status' => 'received',
+            ]);
 
             return $order;
         });

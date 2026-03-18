@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CancellationController;
 use App\Http\Controllers\CategoryController;
@@ -20,36 +22,54 @@ use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardCo
 use App\Http\Controllers\SuperAdmin\ProfileController as SuperAdminProfileController;
 use App\Http\Controllers\SuperAdmin\RestaurantController as SuperAdminRestaurantController;
 use App\Http\Controllers\SuperAdmin\StatisticsController as SuperAdminStatisticsController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect()->route('login'));
 
-// ─── Admin Restaurante — Auth (guest) ────────────────────────────────────────
+// ─── Auth (guest) ────────────────────────────────────────────────────────────
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [LoginController::class, 'create'])->name('login');
     Route::post('/login', [LoginController::class, 'store'])->middleware('throttle:5,1');
+
+    Route::get('/forgot-password', [ForgotPasswordController::class, 'create'])->name('password.request');
+    Route::post('/forgot-password', [ForgotPasswordController::class, 'store'])->middleware('throttle:5,1')->name('password.email');
+
+    Route::get('/reset-password/{token}', [ResetPasswordController::class, 'create'])->name('password.reset');
+    Route::post('/reset-password', [ResetPasswordController::class, 'store'])->middleware('throttle:5,1')->name('password.update');
 });
 
-// ─── Admin Restaurante — Panel (autenticado + tenant) ────────────────────────
+// ─── Admin Restaurante — Todos los roles (autenticado + tenant) ──────────────
 Route::middleware(['auth', 'tenant'])->group(function (): void {
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 
+    // Dashboard — ambos roles (controller filtra métricas por rol)
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    // ─── Pedidos ───────────────────────────────────────────────────────────────
+    // Pedidos — ambos roles (controller filtra por branch para operators)
     Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
     Route::get('/orders/new-count', [OrderController::class, 'newCount'])->name('orders.new-count');
     Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
     Route::put('/orders/{order}/status', [OrderController::class, 'advanceStatus'])->name('orders.advance-status');
     Route::put('/orders/{order}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
 
-    // ─── Cancelaciones ──────────────────────────────────────────────────────────
-    Route::get('/cancellations', [CancellationController::class, 'index'])->name('cancellations.index');
+    // Mapa — ambos roles (filtrado por branch en controller)
 
-    // ─── Mapa operativo ──────────────────────────────────────────────────────────
+    // Mapa — ambos roles
     Route::get('/map', [MapController::class, 'index'])->name('map.index');
 
-    // ─── Configuración ─────────────────────────────────────────────────────────
+    // Perfil — ambos roles (cada usuario edita su propio perfil)
+    Route::get('/settings/profile', [ProfileController::class, 'edit'])->name('settings.profile');
+    Route::put('/settings/profile', [ProfileController::class, 'update'])->name('settings.profile.update');
+});
+
+// ─── Admin Restaurante — Solo admin principal ────────────────────────────────
+Route::middleware(['auth', 'tenant', 'role:admin'])->group(function (): void {
+
+    // Cancelaciones — solo admin
+    Route::get('/cancellations', [CancellationController::class, 'index'])->name('cancellations.index');
+
+    // Configuración
     Route::get('/settings', fn () => redirect()->route('settings.general'))->name('settings.index');
     Route::get('/settings/general', [SettingsController::class, 'general'])->name('settings.general');
     Route::put('/settings/general', [SettingsController::class, 'updateGeneral'])->name('settings.general.update');
@@ -65,15 +85,20 @@ Route::middleware(['auth', 'tenant'])->group(function (): void {
     Route::get('/settings/payment-methods', [PaymentMethodController::class, 'index'])->name('settings.payment-methods');
     Route::put('/settings/payment-methods/{paymentMethod}', [PaymentMethodController::class, 'update'])->name('settings.payment-methods.update');
 
-    Route::get('/settings/profile', [ProfileController::class, 'edit'])->name('settings.profile');
-    Route::put('/settings/profile', [ProfileController::class, 'update'])->name('settings.profile.update');
-
     Route::get('/settings/schedules', [SettingsController::class, 'schedules'])->name('settings.schedules');
     Route::put('/settings/schedules', [SettingsController::class, 'updateSchedules'])->name('settings.schedules.update');
 
     Route::get('/settings/limits', [LimitsController::class, 'index'])->name('settings.limits');
 
-    // ─── Menú ──────────────────────────────────────────────────────────────────
+    // Usuarios del restaurante
+    Route::get('/settings/users', [UserController::class, 'index'])->name('settings.users');
+    Route::get('/settings/users/create', [UserController::class, 'create'])->name('settings.users.create');
+    Route::post('/settings/users', [UserController::class, 'store'])->name('settings.users.store');
+    Route::get('/settings/users/{user}/edit', [UserController::class, 'edit'])->name('settings.users.edit');
+    Route::put('/settings/users/{user}', [UserController::class, 'update'])->name('settings.users.update');
+    Route::delete('/settings/users/{user}', [UserController::class, 'destroy'])->name('settings.users.destroy');
+
+    // Menú
     Route::get('/menu', [MenuController::class, 'index'])->name('menu.index');
     Route::patch('/menu/categories/reorder', [CategoryController::class, 'reorder'])->name('categories.reorder');
     Route::post('/menu/categories', [CategoryController::class, 'store'])->name('categories.store');
@@ -88,7 +113,7 @@ Route::middleware(['auth', 'tenant'])->group(function (): void {
     Route::delete('/menu/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
     Route::patch('/menu/products/{product}/toggle', [ProductController::class, 'toggle'])->name('products.toggle');
 
-    // ─── Promociones ─────────────────────────────────────────────────────────
+    // Promociones
     Route::get('/promotions', [PromotionController::class, 'index'])->name('promotions.index');
     Route::get('/promotions/create', [PromotionController::class, 'create'])->name('promotions.create');
     Route::post('/promotions', [PromotionController::class, 'store'])->name('promotions.store');
@@ -98,7 +123,7 @@ Route::middleware(['auth', 'tenant'])->group(function (): void {
     Route::patch('/promotions/{promotion}/toggle', [PromotionController::class, 'toggle'])->name('promotions.toggle');
     Route::patch('/promotions/reorder', [PromotionController::class, 'reorder'])->name('promotions.reorder');
 
-    // ─── Sucursales ────────────────────────────────────────────────────────────
+    // Sucursales
     Route::get('/branches', [BranchController::class, 'index'])->name('branches.index');
     Route::get('/branches/create', [BranchController::class, 'create'])->name('branches.create');
     Route::post('/branches', [BranchController::class, 'store'])->name('branches.store');

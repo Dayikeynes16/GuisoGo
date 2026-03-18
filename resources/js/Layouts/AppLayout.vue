@@ -18,16 +18,23 @@ const page = usePage()
 const user = computed(() => page.props.auth.user)
 const flash = computed(() => page.props.flash)
 
-const navItems = [
-    { name: 'Dashboard', route: 'dashboard', icon: 'dashboard' },
-    { name: 'Menú Digital', route: 'menu.index', icon: 'restaurant_menu' },
-    { name: 'Promociones', route: 'promotions.index', icon: 'sell' },
-    { name: 'Pedidos', route: 'orders.index', icon: 'receipt_long' },
-    { name: 'Cancelaciones', route: 'cancellations.index', icon: 'cancel' },
-    { name: 'Mapa', route: 'map.index', icon: 'map' },
-    { name: 'Sucursales', route: 'branches.index', icon: 'store' },
-    { name: 'Configuración', route: 'settings.index', icon: 'settings' },
+const isAdmin = computed(() => user.value?.is_admin === true)
+
+const allNavItems = [
+    { name: 'Dashboard', route: 'dashboard', icon: 'dashboard', roles: ['admin', 'operator'] },
+    { name: 'Menú Digital', route: 'menu.index', icon: 'restaurant_menu', roles: ['admin'] },
+    { name: 'Promociones', route: 'promotions.index', icon: 'sell', roles: ['admin'] },
+    { name: 'Pedidos', route: 'orders.index', icon: 'receipt_long', roles: ['admin', 'operator'] },
+    { name: 'Cancelaciones', route: 'cancellations.index', icon: 'cancel', roles: ['admin'] },
+    { name: 'Mapa', route: 'map.index', icon: 'map', roles: ['admin', 'operator'] },
+    { name: 'Sucursales', route: 'branches.index', icon: 'store', roles: ['admin'] },
+    { name: 'Configuración', route: 'settings.index', icon: 'settings', roles: ['admin'] },
 ]
+
+const navItems = computed(() => {
+    const role = user.value?.role ?? 'admin'
+    return allNavItems.filter((item) => item.roles.includes(role))
+})
 
 function isActive(routeName) {
     return route().current(routeName + '*') || route().current(routeName)

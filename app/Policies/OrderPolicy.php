@@ -14,16 +14,38 @@ class OrderPolicy
 
     public function view(User $user, Order $order): bool
     {
-        return $user->restaurant_id === $order->restaurant_id;
+        return $user->restaurant_id === $order->restaurant_id
+            && $this->canAccessBranch($user, $order->branch_id);
     }
 
     public function update(User $user, Order $order): bool
     {
-        return $user->restaurant_id === $order->restaurant_id;
+        return $user->restaurant_id === $order->restaurant_id
+            && $this->canAccessBranch($user, $order->branch_id);
     }
 
     public function cancel(User $user, Order $order): bool
     {
-        return $user->restaurant_id === $order->restaurant_id && $order->isCancellable();
+        return $user->restaurant_id === $order->restaurant_id
+            && $order->isCancellable()
+            && $this->canAccessBranch($user, $order->branch_id);
+    }
+
+    /**
+     * Admins can access all branches. Operators can only access assigned branches.
+     */
+    private function canAccessBranch(User $user, ?int $branchId): bool
+    {
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        if ($branchId === null) {
+            return false;
+        }
+
+        $allowed = $user->allowedBranchIds();
+
+        return in_array($branchId, $allowed, true);
     }
 }
